@@ -1708,9 +1708,99 @@ body {
   white-space: nowrap;
 }
 .void-btn:hover { background: rgba(224,48,48,0.4); }
+
+/* ===== 会員番号モーダル ===== */
+.member-modal {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  width: 420px;
+  max-width: 95vw;
+  padding: 20px;
+  max-height: 85vh;
+  overflow-y: auto;
+}
+.member-search-input {
+  width: 100%;
+  background: #0d0f14;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color: var(--text);
+  font-family: 'Noto Sans JP', sans-serif;
+  font-size: 1.1rem;
+  font-weight: 700;
+  padding: 10px 14px;
+  letter-spacing: 0.1em;
+  outline: none;
+  margin-bottom: 10px;
+}
+.member-search-input:focus { border-color: var(--blue); }
+.member-result-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  margin-bottom: 8px;
+  cursor: pointer;
+  transition: all .15s;
+}
+.member-result-row:hover { border-color: var(--blue); background: rgba(46,124,246,0.1); }
+.member-result-id { font-family: monospace; font-size: 0.85rem; color: var(--gold); flex: 1; letter-spacing: 0.08em; }
+.member-result-pt { font-size: 0.9rem; font-weight: 700; color: var(--accent); white-space: nowrap; }
+.member-result-stamp { font-size: 0.78rem; color: var(--muted); white-space: nowrap; }
+.member-detail-box {
+  background: #0d0f14;
+  border-radius: 12px;
+  padding: 14px;
+  margin-top: 10px;
+}
+.stamp-display { display: flex; gap: 6px; flex-wrap: wrap; margin: 8px 0; }
+.stamp-icon { font-size: 1.4rem; }
+
+/* ===== @media print (レシート) ===== */
+@media print {
+  body > *:not(#receiptPrintArea) { display: none !important; }
+  #receiptPrintArea {
+    display: block !important;
+    position: fixed;
+    inset: 0;
+    background: #fff;
+    z-index: 99999;
+  }
+}
+#receiptPrintArea { display: none; }
 </style>
 </head>
 <body>
+
+<!-- MEMBER MODAL -->
+<div class="modal-overlay" id="memberModal">
+  <div class="member-modal">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+      <div style="font-size:1rem;font-weight:900;">🪪 会員番号を検索</div>
+      <button onclick="closeMemberModal()" style="background:none;border:none;color:var(--muted);font-size:1.4rem;cursor:pointer;">✕</button>
+    </div>
+    <div style="font-size:0.78rem;color:var(--muted);margin-bottom:8px;">前方4桁（または8桁）を入力してください</div>
+    <input class="member-search-input" id="memberSearchInput" type="text" maxlength="14"
+      placeholder="例） B3KF" oninput="onMemberSearch()" autocomplete="off" spellcheck="false">
+    <div id="memberSearchResults"></div>
+    <div id="memberDetailBox" style="display:none;" class="member-detail-box"></div>
+    <div style="display:flex;gap:8px;margin-top:14px;">
+      <button onclick="memberNewIssue()" style="flex:1;padding:10px;background:rgba(25,135,84,0.2);border:1px solid rgba(25,135,84,0.5);border-radius:10px;color:#6ee5a0;font-family:'Noto Sans JP',sans-serif;font-size:0.88rem;font-weight:700;cursor:pointer;">
+        ✨ 新規発行（今回の会計に紐づけ）
+      </button>
+      <button onclick="memberSkip()" style="flex:1;padding:10px;background:rgba(255,255,255,0.05);border:1px solid var(--border);border-radius:10px;color:var(--muted);font-family:'Noto Sans JP',sans-serif;font-size:0.88rem;font-weight:700;cursor:pointer;">
+        スキップ
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- RECEIPT PRINT AREA -->
+<div id="receiptPrintArea"></div>
 
 <!-- HEADER -->
 <div class="header">
@@ -1878,7 +1968,7 @@ body {
       <div id="changeDisplay" style="text-align:center;font-size:0.85rem;color:var(--muted);">金額を入力してください</div>
     </div>
     <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center;">
-      <button class="checkout-close-btn" onclick="printReceipt()" id="receiptBtn" style="background:var(--blue);display:none;font-size:0.9rem;padding:10px 18px;">🖨 レシート</button>
+      <button class="checkout-close-btn" onclick="printReceiptNow()" id="receiptBtn" style="background:var(--blue);display:none;font-size:0.9rem;padding:10px 18px;">🖨 レシート印刷</button>
       <button class="checkout-close-btn" onclick="openRyoshuModal()" id="ryoshuBtn" style="background:var(--green);display:none;font-size:0.9rem;padding:10px 18px;">📝 領収書</button>
       <button class="checkout-close-btn" onclick="closeCheckout()" style="font-size:0.9rem;padding:10px 18px;">閉じる</button>
     </div>
@@ -2429,6 +2519,373 @@ function loadCartDraft() {
   } catch(e) {}
 }
 
+// ===== 会員番号システム =====
+const MEMBER_KEY      = 'pos_members';
+const MEMBER_BAK_KEY  = 'pos_members_bak_date';
+const STAMP_CFG_KEY   = 'pos_stamp_config';
+const CM_KEY          = 'pos_receipt_cm';
+const PAPER_KEY       = 'pos_paper_width';
+const MEMBER_CHARS    = 'ABCDEFGHJKMNPRSTUVWXYZ0123456789'; // I,O,L,Q除外
+
+function _genMemberId() {
+  let id = '';
+  for(let i = 0; i < 12; i++) id += MEMBER_CHARS[Math.floor(Math.random() * MEMBER_CHARS.length)];
+  return id.slice(0,4) + '-' + id.slice(4,8) + '-' + id.slice(8,12);
+}
+
+function _loadMembers() {
+  try { return JSON.parse(localStorage.getItem(MEMBER_KEY) || '{}'); } catch(e) { return {}; }
+}
+function _saveMembers(m) { localStorage.setItem(MEMBER_KEY, JSON.stringify(m)); }
+
+function _loadStampCfg() {
+  const def = {
+    rewards: [
+      { count: 3,  label: '枝豆サービス',   emoji: '🫘' },
+      { count: 5,  label: 'ドリンク1杯',    emoji: '🍺' },
+      { count: 10, label: 'おまかせ1品',    emoji: '🍣' },
+    ],
+    expire_days: 60
+  };
+  try { return Object.assign(def, JSON.parse(localStorage.getItem(STAMP_CFG_KEY) || '{}')); }
+  catch(e) { return def; }
+}
+function _saveStampCfg(cfg) { localStorage.setItem(STAMP_CFG_KEY, JSON.stringify(cfg)); }
+
+function _getReceiptCM()   { return localStorage.getItem(CM_KEY) || ''; }
+function _getPaperWidth()  { return localStorage.getItem(PAPER_KEY) || '58'; }
+
+// 1年未来店の会員を自動消去
+function _expireMembers() {
+  const m = _loadMembers();
+  const ONE_YEAR = 365 * 24 * 3600 * 1000;
+  let count = 0;
+  for(const id in m) {
+    const last = new Date(m[id].last_visit).getTime();
+    if(Date.now() - last > ONE_YEAR) { delete m[id]; count++; }
+  }
+  if(count > 0) { _saveMembers(m); showToast(`📋 ${count}件の期限切れ会員を消去しました`, 'info'); }
+}
+
+// 7日バックアップアラート
+function _checkBackupAlert() {
+  const last = parseInt(localStorage.getItem(MEMBER_BAK_KEY) || '0');
+  if(Date.now() - last > 7 * 24 * 3600 * 1000) {
+    setTimeout(() => showToast('⚠️ 会員データを7日以上バックアップしていません', 'warn'), 2000);
+  }
+}
+
+// 会員モーダル
+let _memberModalCallback = null;
+function openMemberModal(callback) {
+  _memberModalCallback = callback;
+  document.getElementById('memberSearchInput').value = '';
+  document.getElementById('memberSearchResults').innerHTML = '';
+  document.getElementById('memberDetailBox').style.display = 'none';
+  document.getElementById('memberModal').classList.add('open');
+  setTimeout(() => document.getElementById('memberSearchInput').focus(), 100);
+}
+function closeMemberModal() {
+  document.getElementById('memberModal').classList.remove('open');
+  _memberModalCallback = null;
+}
+function memberSkip() {
+  closeMemberModal();
+  if(_memberModalCallback) _memberModalCallback(null);
+}
+
+function onMemberSearch() {
+  const raw = document.getElementById('memberSearchInput').value.toUpperCase().replace(/[^A-Z0-9]/g,'');
+  const box = document.getElementById('memberSearchResults');
+  document.getElementById('memberDetailBox').style.display = 'none';
+  if(raw.length < 4) { box.innerHTML = '<div style="color:var(--muted);font-size:0.8rem;padding:6px;">4文字以上入力してください</div>'; return; }
+  const m = _loadMembers();
+  const key = raw.slice(0,4);
+  const matches = Object.entries(m).filter(([id]) => id.replace(/-/g,'').startsWith(key));
+  if(matches.length === 0) {
+    box.innerHTML = '<div style="color:var(--muted);font-size:0.8rem;padding:6px;">該当する会員が見つかりません</div>';
+    return;
+  }
+  box.innerHTML = matches.map(([id, data]) => {
+    const cfg = _loadStampCfg();
+    const stamps = data.stamps || 0;
+    const nextReward = cfg.rewards.find(r => r.count > stamps);
+    const stampInfo = nextReward ? `あと${nextReward.count - stamps}回で${nextReward.emoji}${nextReward.label}` : '特典達成済！';
+    return `<div class="member-result-row" onclick="selectMember('${id}')">
+      <div class="member-result-id">${id}</div>
+      <div>
+        <div class="member-result-pt">${stamps}スタンプ</div>
+        <div class="member-result-stamp">${stampInfo}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function selectMember(id) {
+  const m = _loadMembers();
+  const data = m[id];
+  if(!data) return;
+  const cfg = _loadStampCfg();
+  const stamps = data.stamps || 0;
+  const box = document.getElementById('memberDetailBox');
+  const stampIcons = Array.from({length: 10}, (_,i) => `<span class="stamp-icon">${i < stamps % 10 ? '⭐' : '☆'}</span>`).join('');
+  const nextReward = cfg.rewards.find(r => r.count > stamps);
+  const rewardMsg = nextReward
+    ? `あと <strong>${nextReward.count - stamps}回</strong> で ${nextReward.emoji} ${nextReward.label}`
+    : '🎉 全特典達成済み！';
+  box.innerHTML = `
+    <div style="font-size:0.75rem;color:var(--muted);margin-bottom:4px;">会員番号</div>
+    <div style="font-family:monospace;font-size:1.1rem;color:var(--gold);font-weight:700;margin-bottom:10px;">${id}</div>
+    <div style="font-size:0.78rem;color:var(--muted);margin-bottom:4px;">来店スタンプ</div>
+    <div class="stamp-display">${stampIcons}</div>
+    <div style="font-size:0.82rem;margin-bottom:12px;">${rewardMsg}</div>
+    <div style="display:flex;gap:8px;">
+      <button onclick="confirmSelectMember('${id}')" style="flex:2;padding:10px;background:var(--blue);color:#fff;border:none;border-radius:10px;font-family:'Noto Sans JP',sans-serif;font-size:0.9rem;font-weight:700;cursor:pointer;">
+        ✅ この会員で会計
+      </button>
+    </div>
+  `;
+  box.style.display = 'block';
+}
+
+function confirmSelectMember(id) {
+  closeMemberModal();
+  if(_memberModalCallback) _memberModalCallback(id);
+}
+
+function memberNewIssue() {
+  closeMemberModal();
+  if(_memberModalCallback) _memberModalCallback('NEW');
+}
+
+// 会計時に会員スタンプ加算
+function applyMemberStamp(memberId, isNew) {
+  const m = _loadMembers();
+  const today = new Date().toISOString().slice(0,10);
+  if(isNew || memberId === 'NEW') {
+    const newId = _genMemberId();
+    m[newId] = { stamps: 1, last_visit: today, joined: today };
+    _saveMembers(m);
+    showToast(`✨ 会員番号発行: ${newId}`, 'success');
+    return newId;
+  } else {
+    if(!m[memberId]) return null;
+    m[memberId].stamps = (m[memberId].stamps || 0) + 1;
+    m[memberId].last_visit = today;
+    _saveMembers(m);
+    const cfg = _loadStampCfg();
+    const stamps = m[memberId].stamps;
+    const reached = cfg.rewards.filter(r => r.count === stamps);
+    if(reached.length > 0) {
+      showToast(`🎉 ${reached[0].emoji} ${reached[0].label} が当たりました！`, 'success');
+    } else {
+      showToast(`⭐ スタンプ追加（${stamps}個）`, 'success');
+    }
+    return memberId;
+  }
+}
+
+// 会員データ エクスポート
+function exportMemberData() {
+  const m = _loadMembers();
+  const blob = new Blob([JSON.stringify(m, null, 2)], {type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `pos_members_${new Date().toISOString().slice(0,10)}.json`;
+  a.click();
+  localStorage.setItem(MEMBER_BAK_KEY, Date.now().toString());
+  showToast('会員データをエクスポートしました', 'success');
+}
+
+// 会員データ インポート
+function importMemberData() {
+  const inp = document.createElement('input');
+  inp.type = 'file'; inp.accept = '.json';
+  inp.onchange = e => {
+    const f = e.target.files[0]; if(!f) return;
+    const r = new FileReader();
+    r.onload = ev => {
+      try {
+        const data = JSON.parse(ev.target.result);
+        if(typeof data !== 'object') throw new Error();
+        _saveMembers(data);
+        localStorage.setItem(MEMBER_BAK_KEY, Date.now().toString());
+        showToast(`✅ ${Object.keys(data).length}件の会員データを復元しました`, 'success');
+      } catch(e) { showToast('ファイルの形式が正しくありません', 'error'); }
+    };
+    r.readAsText(f);
+  };
+  inp.click();
+}
+
+// ===== 印刷機能 =====
+function printReceiptNow() {
+  if(!_receiptData) return;
+  const html = _buildReceiptHTML(_receiptData, _lastMemberId);
+  const area = document.getElementById('receiptPrintArea');
+  area.innerHTML = html;
+  window.print();
+  setTimeout(() => { area.innerHTML = ''; }, 1000);
+}
+
+function _buildReceiptHTML(d, memberId) {
+  const now = new Date(d.datetime);
+  const dateStr = now.toLocaleString('ja-JP');
+  const paperW = _getPaperWidth() === '80' ? '72mm' : '48mm';
+  const itemRows = d.items.map(i =>
+    `<tr><td style="padding:2px 4px;">${i.name}</td><td style="text-align:right;padding:2px 4px;">${i.detail||''}</td><td style="text-align:right;padding:2px 4px;white-space:nowrap;">¥${i.price.toLocaleString()}</td></tr>`
+  ).join('');
+  const discountRow = d.discount > 0
+    ? `<tr><td colspan="2" style="padding:2px 4px;color:#888;">割引</td><td style="text-align:right;padding:2px 4px;color:#888;">-¥${d.discount.toLocaleString()}</td></tr>` : '';
+  const si = appState.shopInfo || {};
+  const shopNameLine = si.name ? `<h2>${si.name}</h2>` : '<h2>🐟 Fish POS Pro</h2>';
+  const shopSubLines = [si.address, si.tel].filter(Boolean).join(' / ');
+  const invoiceLine = si.invoice ? `<div style="font-size:0.65rem;color:#888;text-align:center;">登録番号: ${si.invoice}</div>` : '';
+
+  // スタンプ表示
+  let stampSection = '';
+  if(memberId) {
+    const m = _loadMembers();
+    const mData = m[memberId];
+    const cfg = _loadStampCfg();
+    if(mData) {
+      const stamps = mData.stamps || 0;
+      const stampIcons = cfg.rewards.map(r => {
+        const filled = stamps >= r.count;
+        return `${filled ? r.emoji : '☆'} ${r.label}（${r.count}回）`;
+      }).join('<br>');
+      const nextReward = cfg.rewards.find(r => r.count > stamps);
+      const nextMsg = nextReward ? `あと${nextReward.count - stamps}回で ${nextReward.emoji}${nextReward.label}！` : '🎉 全特典達成！';
+      stampSection = `
+        <div style="border-top:1px dashed #ccc;margin:8px 0;padding-top:8px;">
+          <div style="text-align:center;font-size:0.72rem;color:#555;margin-bottom:4px;">🪪 会員番号</div>
+          <div style="text-align:center;font-family:monospace;font-size:0.85rem;font-weight:bold;margin-bottom:6px;">${memberId}</div>
+          <div style="text-align:center;font-size:0.78rem;margin-bottom:4px;">スタンプ ${stamps}個</div>
+          <div style="text-align:center;font-size:0.75rem;color:#e07000;">${nextMsg}</div>
+        </div>`;
+    } else if(memberId === 'NEW_PENDING') {
+      stampSection = `
+        <div style="border-top:1px dashed #ccc;margin:8px 0;padding-top:8px;text-align:center;">
+          <div style="font-size:0.75rem;color:#555;">✨ 新規会員登録</div>
+          <div style="font-size:0.72rem;color:#888;">レシートに会員番号をご記入します</div>
+        </div>`;
+    }
+  }
+
+  // レシートCM
+  const cm = _getReceiptCM();
+  const cmSection = cm ? `
+    <div style="border-top:1px dashed #ccc;margin:8px 0;padding-top:8px;text-align:center;font-size:0.75rem;color:#444;white-space:pre-wrap;">${cm}</div>` : '';
+
+  return `<div style="font-family:'MS Gothic',monospace;font-size:12px;width:${paperW};margin:0 auto;padding:4px 2px;">
+    ${shopNameLine}
+    <div style="text-align:center;font-size:0.72rem;color:#666;margin-bottom:8px;">${shopSubLines ? shopSubLines + '<br>' : ''}${dateStr}<br>No. ${d.transaction_id}</div>
+    ${invoiceLine}
+    <div style="border-top:1px dashed #999;margin:6px 0;"></div>
+    <table style="width:100%;border-collapse:collapse;margin-bottom:6px;">${itemRows}${discountRow}</table>
+    <div style="border-top:1px dashed #999;margin:6px 0;"></div>
+    <div style="display:flex;justify-content:space-between;font-size:0.78rem;color:#666;padding:1px 4px;"><span>小計</span><span>¥${d.subtotal.toLocaleString()}</span></div>
+    <div style="display:flex;justify-content:space-between;font-size:0.78rem;color:#666;padding:1px 4px;"><span>消費税(${d.tax_rate}%)</span><span>¥${d.tax_amount.toLocaleString()}</span></div>
+    <div style="display:flex;justify-content:space-between;font-weight:bold;font-size:1.05rem;padding:3px 4px;"><span>合計</span><span>¥${d.total.toLocaleString()}</span></div>
+    <div style="text-align:center;font-size:0.85rem;margin:6px 0;">【${d.payment_label || d.payment_method}】</div>
+    <div style="border-top:1px dashed #999;margin:6px 0;"></div>
+    ${stampSection}
+    <div style="text-align:center;font-size:0.72rem;color:#999;margin-top:8px;">ありがとうございました<br><span style="font-size:0.65rem;">※会員番号は1年未利用で失効します</span></div>
+    ${cmSection}
+  </div>`;
+}
+
+function saveStampConfig() {
+  const cfg = _loadStampCfg();
+  cfg.rewards = cfg.rewards.map((r,i) => ({
+    count: parseInt(document.getElementById(`stampCount${i}`)?.value) || r.count,
+    emoji: document.getElementById(`stampEmoji${i}`)?.value || r.emoji,
+    label: document.getElementById(`stampLabel${i}`)?.value || r.label,
+  }));
+  _saveStampCfg(cfg);
+  showToast('スタンプ設定を保存しました', 'success');
+}
+function saveReceiptCM() {
+  const v = document.getElementById('receiptCmInput')?.value || '';
+  localStorage.setItem(CM_KEY, v);
+  showToast('CMを保存しました', 'success');
+}
+function clearReceiptCM() {
+  localStorage.removeItem(CM_KEY);
+  const el = document.getElementById('receiptCmInput');
+  if(el) el.value = '';
+  showToast('CMを消去しました', 'info');
+}
+function setPaperWidth(w) {
+  localStorage.setItem(PAPER_KEY, w);
+  ['58','80'].forEach(s => {
+    const btn = document.getElementById(`paperBtn${s}`);
+    if(!btn) return;
+    const active = s === w;
+    btn.style.borderColor = active ? 'var(--accent)' : 'var(--border)';
+    btn.style.background  = active ? 'rgba(245,166,35,0.15)' : 'rgba(255,255,255,0.04)';
+    btn.style.color       = active ? 'var(--gold)' : 'var(--muted)';
+  });
+  showToast(`用紙幅を${w}mmに設定しました`, 'success');
+}
+
+// ===== バージョンアップ機能 =====
+const POS_CURRENT_VERSION = '8.0.0';
+const GITHUB_VERSION_URL  = 'https://raw.githubusercontent.com/aomilivestockfarming-pixel/fish-pos-pro/main/version.json';
+
+async function posCheckUpdate() {
+  const msgEl   = document.getElementById('posUpdateMsg');
+  const badgeEl = document.getElementById('posLatestBadge');
+  const dlBtn   = document.getElementById('posDownloadBtn');
+  if(!msgEl) return;
+  msgEl.style.display = 'none';
+  badgeEl.textContent = '確認中...';
+  try {
+    const res  = await fetch(GITHUB_VERSION_URL + '?_=' + Date.now());
+    if(!res.ok) throw new Error('取得失敗');
+    const data = await res.json();
+    const latest = data.pos || '?';
+    badgeEl.textContent = '最新: v' + latest;
+    if(_posVerGreater(latest, POS_CURRENT_VERSION)) {
+      badgeEl.style.background = 'rgba(25,135,84,0.35)';
+      badgeEl.style.color = '#6ee5a0';
+      msgEl.style.background = 'rgba(25,135,84,0.2)';
+      msgEl.style.color = '#6ee5a0';
+      msgEl.style.border = '1px solid rgba(25,135,84,0.4)';
+      msgEl.innerHTML = `🎉 <strong>v${latest}</strong> が利用可能です！`;
+      msgEl.style.display = 'block';
+      if(dlBtn) dlBtn.style.display = 'block';
+    } else {
+      badgeEl.style.background = 'rgba(13,110,253,0.25)';
+      badgeEl.style.color = '#7eb3ff';
+      msgEl.style.background = 'rgba(13,110,253,0.15)';
+      msgEl.style.color = '#7eb3ff';
+      msgEl.style.border = '1px solid rgba(13,110,253,0.3)';
+      msgEl.innerHTML = '✅ 最新バージョンです。';
+      msgEl.style.display = 'block';
+      if(dlBtn) dlBtn.style.display = 'none';
+    }
+  } catch(e) {
+    badgeEl.textContent = '確認失敗';
+    badgeEl.style.color = '#ff8a8a';
+    msgEl.style.background = 'rgba(220,53,69,0.2)';
+    msgEl.style.color = '#ff8a8a';
+    msgEl.style.border = '1px solid rgba(220,53,69,0.4)';
+    msgEl.innerHTML = '⚠️ GitHubに接続できませんでした。';
+    msgEl.style.display = 'block';
+  }
+}
+
+function _posVerGreater(a, b) {
+  const pa = a.split('.').map(Number);
+  const pb = b.split('.').map(Number);
+  for(let i = 0; i < 3; i++) {
+    if((pa[i]||0) > (pb[i]||0)) return true;
+    if((pa[i]||0) < (pb[i]||0)) return false;
+  }
+  return false;
+}
+
 // ===== TOAST NOTIFICATION =====
 function showToast(msg, type = 'info') {
   const colors = { info: '#3b82f6', success: '#22c55e', warn: '#f5a623', error: '#e03030' };
@@ -2451,6 +2908,9 @@ function setDate() {
     `${d.getMonth()+1}月${d.getDate()}日（${days[d.getDay()]}）`;
 }
 setDate();
+// 起動時: 会員失効チェック＋バックアップアラート
+_expireMembers();
+_checkBackupAlert();
 
 // ===== CATEGORY TABS =====
 function renderTabs() {
@@ -2870,7 +3330,11 @@ function applyDiscountAndCheckout() {
   appState.discountAmount = Math.max(0, val);
   closeDiscountModal();
   renderOrder();
-  doCheckout(appState.pendingPayType);
+  // 会員モーダルを挟む
+  openMemberModal((memberId) => {
+    _lastMemberId = memberId;
+    doCheckout(appState.pendingPayType);
+  });
 }
 function openDiscountModal() {
   if (appState.cart.length === 0) return;
@@ -2988,6 +3452,15 @@ function doCheckout(type) {
     document.getElementById('ryoshuBtn').style.display = 'inline-block';
     _receiptData = tx;
 
+    // 会員スタンプ処理
+    if(_lastMemberId) {
+      if(_lastMemberId === 'NEW') {
+        _lastMemberId = applyMemberStamp(null, true);
+      } else {
+        applyMemberStamp(_lastMemberId, false);
+      }
+    }
+
     document.getElementById('checkoutModal').classList.add('open');
 
     appState.cart = [];
@@ -3027,6 +3500,7 @@ function cancelTransaction(txId, bizDate) {
 
 function closeCheckout() {
   document.getElementById('checkoutModal').classList.remove('open');
+  _lastMemberId = null;
 }
 
 // ===== SPLIT PAYMENT =====
@@ -3105,7 +3579,11 @@ function confirmSplitPayment() {
   const labelStr = splits.map(s => `${s.label}¥${s.amount.toLocaleString()}`).join('＋');
   // Use first method as primary, record splits in transaction
   appState.splitDetails = splits;
-  doSplitCheckout(labelStr, splits);
+  // 会員モーダルを挟む
+  openMemberModal((memberId) => {
+    _lastMemberId = memberId;
+    doSplitCheckout(labelStr, splits);
+  });
 }
 function doSplitCheckout(labelStr, splits) {
   if (appState.checkoutLock) return;
@@ -3167,6 +3645,14 @@ function doSplitCheckout(labelStr, splits) {
     document.getElementById('receiptBtn').style.display = 'inline-block';
     document.getElementById('ryoshuBtn').style.display = 'inline-block';
     _receiptData = tx;
+    // 会員スタンプ処理（split）
+    if(_lastMemberId) {
+      if(_lastMemberId === 'NEW') {
+        _lastMemberId = applyMemberStamp(null, true);
+      } else {
+        applyMemberStamp(_lastMemberId, false);
+      }
+    }
     document.getElementById('checkoutModal').classList.add('open');
     appState.cart = [];
     renderOrder();
@@ -3279,6 +3765,110 @@ function renderSettingsBody() {
     <button class="backup-btn backup-btn-import" onclick="importAllData()">⬆ バックアップ復元</button>
   `;
   body.appendChild(backupRow);
+
+  // ── バージョンアップ ──────────────────────────────────────────────
+  const verSection = document.createElement('div');
+  verSection.style.cssText = 'margin:16px 0;padding:14px;background:rgba(255,255,255,0.05);border-radius:10px;border:1px solid rgba(255,255,255,0.1);';
+  verSection.innerHTML = `
+    <div style="font-size:0.8rem;font-weight:900;color:var(--accent);margin-bottom:10px;letter-spacing:0.06em;">
+      🔄 アップデート確認
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap;">
+      <span style="font-size:0.78rem;background:rgba(255,255,255,0.1);padding:3px 8px;border-radius:6px;">現在: v8.0.0</span>
+      <span id="posLatestBadge" style="font-size:0.78rem;background:rgba(255,255,255,0.07);padding:3px 8px;border-radius:6px;color:var(--muted);">確認前</span>
+    </div>
+    <div id="posUpdateMsg" style="display:none;font-size:0.8rem;padding:8px 10px;border-radius:8px;margin-bottom:10px;"></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+      <button onclick="posCheckUpdate()" style="flex:1;padding:9px;background:rgba(13,110,253,0.25);color:#7eb3ff;border:1px solid rgba(13,110,253,0.4);border-radius:8px;font-family:'Noto Sans JP',sans-serif;font-size:0.82rem;font-weight:700;cursor:pointer;">
+        ☁️ 最新バージョンを確認
+      </button>
+      <a id="posDownloadBtn" href="https://raw.githubusercontent.com/aomilivestockfarming-pixel/fish-pos-pro/main/pos-system.html"
+         download="pos-system.html"
+         style="display:none;flex:1;padding:9px;background:rgba(25,135,84,0.3);color:#6ee5a0;border:1px solid rgba(25,135,84,0.5);border-radius:8px;font-family:'Noto Sans JP',sans-serif;font-size:0.82rem;font-weight:700;cursor:pointer;text-align:center;text-decoration:none;">
+        ⬇ 最新版をダウンロード
+      </a>
+    </div>
+    <div style="font-size:0.72rem;color:var(--muted);margin-top:8px;">※ダウンロード後このファイルと差し替え。売上・設定データはそのまま引き継がれます。</div>
+  `;
+  body.appendChild(verSection);
+
+  // ── スタンプ特典設定 ──────────────────────────────────────────────
+  const stampSection = document.createElement('div');
+  stampSection.style.cssText = 'margin:16px 0;padding:14px;background:rgba(255,255,255,0.05);border-radius:10px;border:1px solid rgba(255,255,255,0.1);';
+  const cfg = _loadStampCfg();
+  stampSection.innerHTML = `
+    <div style="font-size:0.8rem;font-weight:900;color:var(--accent);margin-bottom:10px;letter-spacing:0.06em;">⭐ スタンプ特典設定</div>
+    ${cfg.rewards.map((r,i) => `
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;">
+        <input type="number" value="${r.count}" min="1" max="99" id="stampCount${i}"
+          style="width:56px;background:#0d0f14;border:1px solid var(--border);border-radius:8px;color:var(--gold);font-family:'Orbitron',sans-serif;font-size:0.9rem;padding:6px;text-align:center;">
+        <span style="color:var(--muted);font-size:0.8rem;">回で</span>
+        <input type="text" value="${r.emoji}" id="stampEmoji${i}" maxlength="2"
+          style="width:44px;background:#0d0f14;border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:1.1rem;padding:6px;text-align:center;">
+        <input type="text" value="${r.label}" id="stampLabel${i}" maxlength="20"
+          style="flex:1;background:#0d0f14;border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'Noto Sans JP',sans-serif;font-size:0.85rem;padding:6px 10px;">
+      </div>
+    `).join('')}
+    <button onclick="saveStampConfig()" style="width:100%;padding:9px;background:rgba(245,166,35,0.2);border:1px solid rgba(245,166,35,0.4);border-radius:8px;color:var(--gold);font-family:'Noto Sans JP',sans-serif;font-size:0.82rem;font-weight:700;cursor:pointer;margin-top:4px;">
+      💾 スタンプ設定を保存
+    </button>
+  `;
+  body.appendChild(stampSection);
+
+  // ── レシートCM ────────────────────────────────────────────────────
+  const cmSection = document.createElement('div');
+  cmSection.style.cssText = 'margin:16px 0;padding:14px;background:rgba(255,255,255,0.05);border-radius:10px;border:1px solid rgba(255,255,255,0.1);';
+  cmSection.innerHTML = `
+    <div style="font-size:0.8rem;font-weight:900;color:var(--accent);margin-bottom:10px;letter-spacing:0.06em;">📢 レシートCM・お知らせ</div>
+    <textarea id="receiptCmInput" rows="3" placeholder="例）🎉 今週末イベント開催！&#10;毎週金曜は生ビール半額DAY&#10;LINE: @fishpospro"
+      style="width:100%;background:#0d0f14;border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'Noto Sans JP',sans-serif;font-size:0.82rem;padding:8px 10px;resize:vertical;">${_getReceiptCM()}</textarea>
+    <div style="display:flex;gap:8px;margin-top:8px;">
+      <button onclick="saveReceiptCM()" style="flex:1;padding:9px;background:rgba(13,110,253,0.2);border:1px solid rgba(13,110,253,0.4);border-radius:8px;color:#7eb3ff;font-family:'Noto Sans JP',sans-serif;font-size:0.82rem;font-weight:700;cursor:pointer;">
+        💾 CMを保存
+      </button>
+      <button onclick="clearReceiptCM()" style="flex:1;padding:9px;background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:8px;color:var(--muted);font-family:'Noto Sans JP',sans-serif;font-size:0.82rem;font-weight:700;cursor:pointer;">
+        🗑 CMを消去
+      </button>
+    </div>
+  `;
+  body.appendChild(cmSection);
+
+  // ── 用紙幅設定 ────────────────────────────────────────────────────
+  const paperSection = document.createElement('div');
+  paperSection.style.cssText = 'margin:16px 0;padding:14px;background:rgba(255,255,255,0.05);border-radius:10px;border:1px solid rgba(255,255,255,0.1);';
+  const curPaper = _getPaperWidth();
+  paperSection.innerHTML = `
+    <div style="font-size:0.8rem;font-weight:900;color:var(--accent);margin-bottom:10px;letter-spacing:0.06em;">🖨 レシート用紙幅</div>
+    <div style="display:flex;gap:10px;">
+      <button id="paperBtn58" onclick="setPaperWidth('58')"
+        style="flex:1;padding:10px;border-radius:8px;font-family:'Noto Sans JP',sans-serif;font-size:0.85rem;font-weight:700;cursor:pointer;border:2px solid ${curPaper==='58'?'var(--accent)':'var(--border)'};background:${curPaper==='58'?'rgba(245,166,35,0.15)':'rgba(255,255,255,0.04)'};color:${curPaper==='58'?'var(--gold)':'var(--muted)'};">
+        58mm
+      </button>
+      <button id="paperBtn80" onclick="setPaperWidth('80')"
+        style="flex:1;padding:10px;border-radius:8px;font-family:'Noto Sans JP',sans-serif;font-size:0.85rem;font-weight:700;cursor:pointer;border:2px solid ${curPaper==='80'?'var(--accent)':'var(--border)'};background:${curPaper==='80'?'rgba(245,166,35,0.15)':'rgba(255,255,255,0.04)'};color:${curPaper==='80'?'var(--gold)':'var(--muted)'};">
+        80mm
+      </button>
+    </div>
+  `;
+  body.appendChild(paperSection);
+
+  // ── 会員データ管理 ────────────────────────────────────────────────
+  const memberSection = document.createElement('div');
+  memberSection.style.cssText = 'margin:16px 0;padding:14px;background:rgba(255,255,255,0.05);border-radius:10px;border:1px solid rgba(255,255,255,0.1);';
+  const memberCount = Object.keys(_loadMembers()).length;
+  memberSection.innerHTML = `
+    <div style="font-size:0.8rem;font-weight:900;color:var(--accent);margin-bottom:10px;letter-spacing:0.06em;">🪪 会員データ管理</div>
+    <div style="font-size:0.8rem;color:var(--muted);margin-bottom:10px;">登録会員数: <strong style="color:var(--text);">${memberCount}名</strong>　（1年未来店で自動消去）</div>
+    <div style="display:flex;gap:8px;">
+      <button onclick="exportMemberData()" style="flex:1;padding:9px;background:rgba(25,135,84,0.2);border:1px solid rgba(25,135,84,0.4);border-radius:8px;color:#6ee5a0;font-family:'Noto Sans JP',sans-serif;font-size:0.82rem;font-weight:700;cursor:pointer;">
+        ⬇ エクスポート
+      </button>
+      <button onclick="importMemberData()" style="flex:1;padding:9px;background:rgba(13,110,253,0.2);border:1px solid rgba(13,110,253,0.4);border-radius:8px;color:#7eb3ff;font-family:'Noto Sans JP',sans-serif;font-size:0.82rem;font-weight:700;cursor:pointer;">
+        ⬆ インポート
+      </button>
+    </div>
+  `;
+  body.appendChild(memberSection);
 
   // ── サンプルデータ管理 ────────────────────────────────────────────
   const sampleSection = document.createElement('div');
@@ -4081,6 +4671,7 @@ function doVoid(txId, bizDate) {
 
 // ===== レシートPDF =====
 let _receiptData = null;
+let _lastMemberId = null;
 function printReceipt() {
   if (!_receiptData) return;
   const d = _receiptData;

@@ -2406,6 +2406,51 @@ global.bootstrap=bootstrap;
                         </div>
                     </div>
                     <!-- ===== /魚種DB追加読み込み ===== -->
+
+                    <!-- ===== GitHubからDB配信ダウンロード ===== -->
+                    <div class="col-md-6 mb-4">
+                        <div class="card p-3 shadow-sm border-0">
+                            <h5 class="fw-bold mb-3" style="color:#20c997;">
+                                <i class="bi bi-cloud-download"></i> DBを配信からDL
+                            </h5>
+                            <p class="text-muted small mb-3">GitHubから最新DBファイルを取得します。取得後は「DBファイルを選択」で読み込んでください。</p>
+                            <div class="d-flex flex-column gap-2" id="fdpDbDownloadList">
+                                <button class="btn btn-outline-success btn-sm" onclick="fdpDownloadDB('fish-db-standard.js')">
+                                    <i class="bi bi-download"></i> 標準DB
+                                </button>
+                                <button class="btn btn-outline-info btn-sm" onclick="fdpDownloadDB('fish-db-winter.js')">
+                                    <i class="bi bi-download"></i> 冬季DB
+                                </button>
+                                <button class="btn btn-outline-warning btn-sm" onclick="fdpDownloadDB('fish-db-summer.js')">
+                                    <i class="bi bi-download"></i> 夏季DB
+                                </button>
+                            </div>
+                            <div id="fdpDbDlMsg" class="mt-2 small" style="display:none;"></div>
+                        </div>
+                    </div>
+                    <!-- ===== /GitHubからDB配信ダウンロード ===== -->
+
+                    <!-- ===== レシートCM設定 ===== -->
+                    <div class="col-md-6 mb-4">
+                        <div class="card p-3 shadow-sm border-0">
+                            <h5 class="fw-bold mb-3" style="color:#fd7e14;">
+                                <i class="bi bi-megaphone"></i> レシートCM・お知らせ
+                            </h5>
+                            <p class="text-muted small mb-2">FDP出力レシートの末尾に表示されるメッセージを設定します。</p>
+                            <textarea id="fdpReceiptCmInput" class="form-control form-control-sm mb-2" rows="3"
+                                placeholder="例）🎉 今月のイベント情報&#10;詳細はLINEをご確認ください">${localStorage.getItem('fdp_receipt_cm')||''}</textarea>
+                            <div class="d-flex gap-2">
+                                <button class="btn btn-outline-warning btn-sm flex-fill" onclick="fdpSaveReceiptCM()">
+                                    <i class="bi bi-save"></i> 保存
+                                </button>
+                                <button class="btn btn-outline-secondary btn-sm" onclick="fdpClearReceiptCM()">
+                                    <i class="bi bi-trash"></i> 消去
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- ===== /レシートCM設定 ===== -->
+
                     <!-- v1.9.0 PINロック設定 -->
                     <div class="col-md-6 mb-4">
                         <div class="card p-3 shadow-sm border-0">
@@ -2425,6 +2470,33 @@ global.bootstrap=bootstrap;
                             </div>
                         </div>
                     </div>
+                    <!-- ===== バージョンアップ ===== -->
+                    <div class="col-12 mb-4">
+                        <div class="card p-3 shadow-sm border-0">
+                            <h5 class="fw-bold mb-3" style="color:#0d6efd;">
+                                <i class="bi bi-arrow-clockwise"></i> アップデート確認
+                            </h5>
+                            <div class="d-flex align-items-center gap-3 mb-3">
+                                <span class="badge bg-secondary" style="font-size:0.85rem;">現在: v2.0.9</span>
+                                <span id="fdpLatestBadge" class="badge bg-light text-muted" style="font-size:0.85rem;">GitHubを確認中...</span>
+                            </div>
+                            <div id="fdpUpdateMsg" class="alert py-2 small mb-3" style="display:none;"></div>
+                            <div class="d-flex gap-2">
+                                <button class="btn btn-outline-primary btn-sm" onclick="fdpCheckUpdate()">
+                                    <i class="bi bi-cloud"></i> 最新バージョンを確認
+                                </button>
+                                <a id="fdpDownloadBtn" class="btn btn-success btn-sm" style="display:none;"
+                                   href="https://raw.githubusercontent.com/aomilivestockfarming-pixel/fish-pos-pro/main/fish-decision-pro.html"
+                                   download="fish-decision-pro.html">
+                                    <i class="bi bi-download"></i> 最新版をダウンロード
+                                </a>
+                            </div>
+                            <div class="mt-2">
+                                <small class="text-muted">※ダウンロード後、このファイルと差し替えてください。データはそのまま引き継がれます。</small>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- ===== /バージョンアップ ===== -->
                 </div><!-- /row -->
             </div><!-- /tabData -->
             <!-- ===== 一括原価計算タブ ===== -->
@@ -9165,6 +9237,90 @@ if (typeof module !== 'undefined' && module.exports) {
         function pinInput(d)  { PinLock.input(d); }
         function pinDel()     { PinLock.del(); }
         function pinFishTap() { PinLock.fishTap(); }
+
+        // ===== バージョンアップ機能 =====
+        const FDP_CURRENT_VERSION = '2.0.9';
+        const GITHUB_BASE_URL     = 'https://raw.githubusercontent.com/aomilivestockfarming-pixel/fish-pos-pro/main/';
+        const GITHUB_VERSION_URL  = GITHUB_BASE_URL + 'version.json';
+
+        async function fdpCheckUpdate() {
+            const msgEl  = document.getElementById('fdpUpdateMsg');
+            const badgeEl = document.getElementById('fdpLatestBadge');
+            const dlBtn  = document.getElementById('fdpDownloadBtn');
+            if(!msgEl) return;
+            msgEl.style.display = 'none';
+            badgeEl.textContent = '確認中...';
+            badgeEl.className = 'badge bg-light text-muted';
+            try {
+                const res  = await fetch(GITHUB_VERSION_URL + '?_=' + Date.now());
+                if(!res.ok) throw new Error('取得失敗');
+                const data = await res.json();
+                const latest = data.fdp || '?';
+                badgeEl.textContent = '最新: v' + latest;
+                if(_verGreater(latest, FDP_CURRENT_VERSION)) {
+                    badgeEl.className = 'badge bg-success';
+                    msgEl.className = 'alert alert-success py-2 small mb-3';
+                    msgEl.innerHTML = `🎉 <strong>v${latest}</strong> が利用可能です！ダウンロードして差し替えてください。`;
+                    msgEl.style.display = 'block';
+                    dlBtn.style.display = 'inline-block';
+                } else {
+                    badgeEl.className = 'badge bg-info text-dark';
+                    msgEl.className = 'alert alert-info py-2 small mb-3';
+                    msgEl.innerHTML = '✅ 最新バージョンです。';
+                    msgEl.style.display = 'block';
+                    dlBtn.style.display = 'none';
+                }
+            } catch(e) {
+                badgeEl.textContent = '確認失敗';
+                badgeEl.className = 'badge bg-danger';
+                msgEl.className = 'alert alert-warning py-2 small mb-3';
+                msgEl.innerHTML = '⚠️ GitHubに接続できませんでした。ネット接続を確認してください。';
+                msgEl.style.display = 'block';
+            }
+        }
+
+        function _verGreater(a, b) {
+            const pa = a.split('.').map(Number);
+            const pb = b.split('.').map(Number);
+            for(let i = 0; i < 3; i++) {
+                if((pa[i]||0) > (pb[i]||0)) return true;
+                if((pa[i]||0) < (pb[i]||0)) return false;
+            }
+            return false;
+        }
+
+        // ===== GitHubからDB配信DL =====
+        async function fdpDownloadDB(filename) {
+            const msgEl = document.getElementById('fdpDbDlMsg');
+            if(msgEl) { msgEl.style.display='block'; msgEl.textContent='取得中...'; msgEl.style.color='#6c757d'; }
+            try {
+                const res = await fetch(GITHUB_BASE_URL + 'db/' + filename + '?_=' + Date.now());
+                if(!res.ok) throw new Error('ファイルが見つかりません');
+                const text = await res.text();
+                const blob = new Blob([text], {type:'application/javascript'});
+                const a = document.createElement('a');
+                a.href = URL.createObjectURL(blob);
+                a.download = filename;
+                a.click();
+                URL.revokeObjectURL(a.href);
+                if(msgEl) { msgEl.textContent = `✅ ${filename} をダウンロードしました。「DBファイルを選択」で読み込んでください。`; msgEl.style.color='#198754'; }
+            } catch(e) {
+                if(msgEl) { msgEl.textContent = `⚠️ 取得失敗: ${e.message}`; msgEl.style.color='#dc3545'; }
+            }
+        }
+
+        // ===== レシートCM =====
+        function fdpSaveReceiptCM() {
+            const v = document.getElementById('fdpReceiptCmInput')?.value || '';
+            localStorage.setItem('fdp_receipt_cm', v);
+            showToast('レシートCMを保存しました', 'success');
+        }
+        function fdpClearReceiptCM() {
+            localStorage.removeItem('fdp_receipt_cm');
+            const el = document.getElementById('fdpReceiptCmInput');
+            if(el) el.value = '';
+            showToast('レシートCMを消去しました', 'info');
+        }
 
         function confirmResetPIN() {
             if(!confirm('PINをリセットしますか？\n次回ページ読み込み時に新しいPINを設定できます。')) return;
