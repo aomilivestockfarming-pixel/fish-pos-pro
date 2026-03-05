@@ -1,0 +1,16 @@
+{
+  "meta": {
+    "name": "ハロウィンテンプレート",
+    "version": "1.0.0",
+    "description": "ハロウィンシーズン向けスタンプ設定"
+  },
+  "stamp_config": {
+    "rewards": [
+      { "count": 3,  "label": "かぼちゃスープ",  "emoji": "🎃" },
+      { "count": 5,  "label": "仮装割引10%",    "emoji": "👻" },
+      { "count": 10, "label": "怪物コース招待",   "emoji": "🧟" }
+    ],
+    "expire_days": 31
+  },
+  "receipt_cm": "👻 10/31まで！仮装で来店で10%OFF\nハロウィンメニュー全品ご用意"
+}
