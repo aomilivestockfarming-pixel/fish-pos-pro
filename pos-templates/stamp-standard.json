@@ -1,0 +1,15 @@
+{
+  "meta": {
+    "name": "スタンプ標準テンプレート",
+    "version": "1.0.0",
+    "description": "居酒屋・食堂向けシンプルスタンプ設定"
+  },
+  "stamp_config": {
+    "rewards": [
+      { "count": 3,  "label": "枝豆サービス",    "emoji": "🫘" },
+      { "count": 5,  "label": "ドリンク1杯",     "emoji": "🍺" },
+      { "count": 10, "label": "おまかせ1品",     "emoji": "🍣" }
+    ],
+    "expire_days": 60
+  }
+}
