@@ -1849,22 +1849,7 @@ body {
           🪪 会員スタンプを使う（任意）
         </button>
       </div>
-      <div class="payment-btns">
-        <button id="payBtn-cash"   class="pay-btn pay-cash"   onclick="openDiscountThenCheckout('現金')">💴 現金</button>
-        <button id="payBtn-card"   class="pay-btn pay-card    pay-disabled" onclick="openDiscountThenCheckout('カード')">💳 カード</button>
-      </div>
-      <div class="payment-btns" style="margin-bottom:8px;">
-        <button id="payBtn-paypay"  class="pay-btn pay-paypay  pay-disabled" onclick="openDiscountThenCheckout('PayPay')">🟡 PayPay</button>
-        <button id="payBtn-linepay" class="pay-btn pay-linepay pay-disabled" onclick="openDiscountThenCheckout('LINE Pay')">🟢 LINE Pay</button>
-      </div>
-      <div class="payment-btns" style="margin-bottom:8px;">
-        <button id="payBtn-ic"      class="pay-btn pay-ic      pay-disabled" onclick="openDiscountThenCheckout('交通系IC')">🚃 交通系IC</button>
-        <button id="payBtn-other"   class="pay-btn pay-other   pay-disabled" onclick="openDiscountThenCheckout('その他電子')">📱 その他</button>
-      </div>
-      <div class="payment-btns" style="margin-bottom:8px;">
-        <button id="payBtn-split"   class="pay-btn pay-split   pay-disabled" style="grid-column:1/-1;" onclick="openSplitPayment()">🔀 複数支払い（現金＋QRなど）</button>
-      </div>
-      <button class="checkout-btn" onclick="openDiscountThenCheckout('精算')">精算</button>
+      <button class="checkout-btn" onclick="openSeisanModal()" style="font-size:1.2rem;padding:14px;letter-spacing:0.15em;">🧾 清　算</button>
     </div>
   </div>
 
@@ -1959,42 +1944,96 @@ body {
 <div class="modal-overlay" id="checkoutModal">
   <div class="checkout-modal">
     <div class="checkout-icon">✅</div>
-    <div style="font-size:1rem;color:var(--muted)" id="checkoutTypeLabel">現金でのお支払い</div>
+    <div style="font-size:1rem;color:var(--muted)" id="checkoutTypeLabel">お会計完了</div>
     <div class="checkout-total-disp" id="checkoutTotalDisp">¥0</div>
     <div class="checkout-type-label" id="checkoutItemCount"></div>
-    <!-- 会員スタンプ（会計モーダル内） -->
-    <div id="checkoutMemberArea" style="margin-bottom:14px;">
-      <div style="font-size:0.78rem;color:var(--muted);margin-bottom:6px;">🪪 会員スタンプ</div>
-      <div style="display:flex;gap:8px;">
-        <button onclick="openMemberFromCheckout()" id="checkoutMemberBtn"
-          style="flex:1;padding:9px 12px;background:rgba(245,166,35,0.08);border:1px solid rgba(245,166,35,0.25);border-radius:10px;color:var(--muted);font-family:'Noto Sans JP',sans-serif;font-size:0.82rem;font-weight:700;cursor:pointer;text-align:left;">
-          🪪 番号を入力する
-        </button>
-        <button onclick="clearCheckoutMember()"
-          style="padding:9px 14px;background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:10px;color:var(--muted);font-family:'Noto Sans JP',sans-serif;font-size:0.8rem;cursor:pointer;">
-          ✕
-        </button>
-      </div>
-      <div id="checkoutMemberInfo" style="display:none;margin-top:6px;padding:8px 12px;background:rgba(245,166,35,0.1);border:1px solid rgba(245,166,35,0.3);border-radius:8px;font-size:0.78rem;color:var(--gold);"></div>
-    </div>
-    <!-- お釣り計算（現金時のみ表示） -->
-    <div id="changeCalcSection" style="display:none;background:#0d0f14;border-radius:14px;padding:14px 16px;margin-bottom:16px;">
-      <div style="font-size:0.78rem;color:var(--muted);margin-bottom:8px;">💴 お預かり金額</div>
-      <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:center;margin-bottom:10px;" id="cashPresets"></div>
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
-        <span style="color:var(--muted);font-size:0.9rem;">¥</span>
-        <input type="number" id="cashReceivedInput" placeholder="0" min="0"
-          style="flex:1;background:#1e2029;border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:1.2rem;font-weight:700;padding:8px 12px;font-family:'Noto Sans JP',sans-serif;text-align:right;"
-          oninput="calcChange()">
-      </div>
-      <div id="changeDisplay" style="text-align:center;font-size:0.85rem;color:var(--muted);">金額を入力してください</div>
-    </div>
-    <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center;">
+    <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-top:16px;">
       <button class="checkout-close-btn" onclick="printReceiptNow()" id="receiptBtn" style="background:var(--blue);display:none;font-size:0.9rem;padding:10px 18px;">🖨 レシート印刷</button>
       <button class="checkout-close-btn" onclick="openRyoshuModal()" id="ryoshuBtn" style="background:var(--green);display:none;font-size:0.9rem;padding:10px 18px;">📝 領収書</button>
       <button class="checkout-close-btn" onclick="closeCheckout()" style="font-size:0.9rem;padding:10px 18px;">閉じる</button>
     </div>
   </div>
+</div>
+
+<!-- ===== 新・精算フロー（3ステップ） ===== -->
+<div class="modal-overlay" id="seisanModal">
+
+  <!-- STEP 1: 合計表示 + 支払方法選択 -->
+  <div id="seisanStep1" class="checkout-modal" style="width:400px;padding:24px;">
+    <div style="font-size:1rem;font-weight:900;margin-bottom:14px;text-align:center;color:var(--accent);letter-spacing:0.08em;">🧾 お会計</div>
+    <div style="background:#0d0f14;border:2px solid var(--gold);border-radius:14px;padding:14px 20px;margin-bottom:14px;text-align:center;">
+      <div style="font-size:0.72rem;color:var(--gold);font-weight:700;letter-spacing:0.08em;margin-bottom:4px;">合計金額（税込）</div>
+      <div id="seisanTotalDisp" style="font-family:'Orbitron',sans-serif;font-size:2.8rem;font-weight:900;color:var(--gold);">¥0</div>
+      <div id="seisanBreakdown" style="font-size:0.75rem;color:var(--muted);margin-top:4px;"></div>
+    </div>
+    <button onclick="openSeisanDiscount()" id="seisanDiscountBtn" style="width:100%;padding:8px;background:rgba(255,136,136,0.1);border:1px solid rgba(255,136,136,0.3);border-radius:10px;color:#ff8888;font-family:'Noto Sans JP',sans-serif;font-size:0.82rem;font-weight:700;cursor:pointer;margin-bottom:12px;">🏷 割引を設定</button>
+    <div style="font-size:0.72rem;color:var(--muted);margin-bottom:8px;text-align:center;letter-spacing:0.06em;">支払方法を選択してください</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
+      <button id="seisanBtn-cash"    onclick="seisanSelectPayment('現金')"    class="pay-btn pay-cash"             style="padding:14px 4px;font-size:0.95rem;">💴 現金</button>
+      <button id="seisanBtn-card"    onclick="seisanSelectPayment('カード')"  class="pay-btn pay-card    pay-disabled" style="padding:14px 4px;font-size:0.95rem;">💳 カード</button>
+      <button id="seisanBtn-paypay"  onclick="seisanSelectPayment('PayPay')"  class="pay-btn pay-paypay  pay-disabled" style="padding:14px 4px;font-size:0.95rem;">🟡 PayPay</button>
+      <button id="seisanBtn-linepay" onclick="seisanSelectPayment('LINE Pay')" class="pay-btn pay-linepay pay-disabled" style="padding:14px 4px;font-size:0.95rem;">🟢 LINE Pay</button>
+      <button id="seisanBtn-ic"      onclick="seisanSelectPayment('交通系IC')" class="pay-btn pay-ic      pay-disabled" style="padding:14px 4px;font-size:0.92rem;">🚃 交通系IC</button>
+      <button id="seisanBtn-other"   onclick="seisanSelectPayment('その他電子')" class="pay-btn pay-other  pay-disabled" style="padding:14px 4px;font-size:0.92rem;">📱 その他</button>
+    </div>
+    <button id="seisanBtn-split" onclick="openSeisanSplit()" class="pay-btn pay-split pay-disabled" style="width:100%;padding:12px;font-size:0.88rem;margin-bottom:10px;">🔀 複数支払い（現金＋QRなど）</button>
+    <button onclick="closeSeisanModal()" style="width:100%;padding:10px;background:#252837;border:1px solid var(--border);border-radius:10px;color:var(--muted);font-family:'Noto Sans JP',sans-serif;font-size:0.88rem;cursor:pointer;">キャンセル</button>
+  </div>
+
+  <!-- STEP 2: お預かり金額テンキー（現金時のみ） -->
+  <div id="seisanStep2" class="checkout-modal" style="width:380px;padding:24px;display:none;">
+    <div style="font-size:1rem;font-weight:900;margin-bottom:4px;text-align:center;color:var(--accent);">💴 現金精算</div>
+    <div style="font-size:0.78rem;color:var(--muted);text-align:center;margin-bottom:14px;">お預かり金額を入力してください</div>
+    <div style="display:flex;justify-content:space-between;align-items:center;background:#0d0f14;border-radius:10px;padding:10px 14px;margin-bottom:10px;">
+      <span style="font-size:0.8rem;color:var(--muted);">合計</span>
+      <span id="seisanStep2Total" style="font-family:'Orbitron',sans-serif;font-size:1.3rem;font-weight:900;color:var(--gold);">¥0</span>
+    </div>
+    <div style="background:#0d0f14;border:2px solid var(--gold);border-radius:14px;padding:14px 16px;margin-bottom:10px;">
+      <div style="font-size:0.72rem;color:var(--gold);font-weight:700;letter-spacing:0.08em;margin-bottom:6px;">💴 お預かり金額</div>
+      <div style="display:flex;align-items:center;justify-content:flex-end;gap:4px;">
+        <span style="font-size:1rem;color:var(--muted);">¥</span>
+        <div id="seisanCashDisplay" style="font-size:2rem;font-weight:900;font-family:'Orbitron',sans-serif;color:var(--text);min-width:120px;text-align:right;letter-spacing:0.04em;">0</div>
+      </div>
+    </div>
+    <div style="display:flex;gap:6px;margin-bottom:10px;" id="seisanCashPresets"></div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:10px;">
+      <button onclick="seisanTenkey('1')"   style="padding:14px;background:var(--panel);border:1px solid var(--border);border-radius:10px;color:var(--text);font-size:1.3rem;font-weight:700;cursor:pointer;font-family:'Orbitron',sans-serif;">1</button>
+      <button onclick="seisanTenkey('2')"   style="padding:14px;background:var(--panel);border:1px solid var(--border);border-radius:10px;color:var(--text);font-size:1.3rem;font-weight:700;cursor:pointer;font-family:'Orbitron',sans-serif;">2</button>
+      <button onclick="seisanTenkey('3')"   style="padding:14px;background:var(--panel);border:1px solid var(--border);border-radius:10px;color:var(--text);font-size:1.3rem;font-weight:700;cursor:pointer;font-family:'Orbitron',sans-serif;">3</button>
+      <button onclick="seisanTenkey('4')"   style="padding:14px;background:var(--panel);border:1px solid var(--border);border-radius:10px;color:var(--text);font-size:1.3rem;font-weight:700;cursor:pointer;font-family:'Orbitron',sans-serif;">4</button>
+      <button onclick="seisanTenkey('5')"   style="padding:14px;background:var(--panel);border:1px solid var(--border);border-radius:10px;color:var(--text);font-size:1.3rem;font-weight:700;cursor:pointer;font-family:'Orbitron',sans-serif;">5</button>
+      <button onclick="seisanTenkey('6')"   style="padding:14px;background:var(--panel);border:1px solid var(--border);border-radius:10px;color:var(--text);font-size:1.3rem;font-weight:700;cursor:pointer;font-family:'Orbitron',sans-serif;">6</button>
+      <button onclick="seisanTenkey('7')"   style="padding:14px;background:var(--panel);border:1px solid var(--border);border-radius:10px;color:var(--text);font-size:1.3rem;font-weight:700;cursor:pointer;font-family:'Orbitron',sans-serif;">7</button>
+      <button onclick="seisanTenkey('8')"   style="padding:14px;background:var(--panel);border:1px solid var(--border);border-radius:10px;color:var(--text);font-size:1.3rem;font-weight:700;cursor:pointer;font-family:'Orbitron',sans-serif;">8</button>
+      <button onclick="seisanTenkey('9')"   style="padding:14px;background:var(--panel);border:1px solid var(--border);border-radius:10px;color:var(--text);font-size:1.3rem;font-weight:700;cursor:pointer;font-family:'Orbitron',sans-serif;">9</button>
+      <button onclick="seisanTenkey('00')"  style="padding:14px;background:var(--panel);border:1px solid var(--border);border-radius:10px;color:var(--muted);font-size:1.1rem;font-weight:700;cursor:pointer;font-family:'Orbitron',sans-serif;">00</button>
+      <button onclick="seisanTenkey('0')"   style="padding:14px;background:var(--panel);border:1px solid var(--border);border-radius:10px;color:var(--text);font-size:1.3rem;font-weight:700;cursor:pointer;font-family:'Orbitron',sans-serif;">0</button>
+      <button onclick="seisanTenkey('DEL')" style="padding:14px;background:rgba(224,48,48,0.15);border:1px solid rgba(224,48,48,0.3);border-radius:10px;color:#ff8080;font-size:1.1rem;font-weight:700;cursor:pointer;">⌫</button>
+    </div>
+    <button onclick="seisanCashConfirm()" style="width:100%;padding:14px;background:var(--red);color:#fff;border:none;border-radius:12px;font-family:'Noto Sans JP',sans-serif;font-size:1.1rem;font-weight:900;cursor:pointer;margin-bottom:8px;letter-spacing:0.08em;">精　算</button>
+    <button onclick="showSeisanStep(1)" style="width:100%;padding:10px;background:#252837;border:1px solid var(--border);border-radius:10px;color:var(--muted);font-family:'Noto Sans JP',sans-serif;font-size:0.88rem;cursor:pointer;">← 戻る</button>
+  </div>
+
+  <!-- STEP 3: おつり / 完了画面 -->
+  <div id="seisanStep3" class="checkout-modal" style="width:380px;padding:28px;display:none;">
+    <div class="checkout-icon" id="seisanStep3Icon">✅</div>
+    <div style="font-size:1rem;color:var(--muted);margin-bottom:4px;" id="seisanStep3Label">お会計完了</div>
+    <div class="checkout-total-disp" id="seisanStep3Total">¥0</div>
+    <div class="checkout-type-label" id="seisanStep3Sub"></div>
+    <div id="seisanChangeArea" style="display:none;margin:14px 0 6px;">
+      <div style="background:#0d0f14;border-radius:14px;padding:16px;text-align:center;">
+        <div style="font-size:0.75rem;color:var(--muted);margin-bottom:6px;">お釣り</div>
+        <div id="seisanChangeAmt" style="font-family:'Orbitron',sans-serif;font-size:3rem;font-weight:900;color:var(--accent);">¥0</div>
+        <div id="seisanChangeDetail" style="font-size:0.78rem;color:var(--muted);margin-top:6px;"></div>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-top:16px;">
+      <button onclick="seisanPrintReceipt()" style="flex:1;min-width:110px;padding:11px 14px;background:var(--blue);color:#fff;border:none;border-radius:12px;font-family:'Noto Sans JP',sans-serif;font-size:0.88rem;font-weight:700;cursor:pointer;">🖨 レシート</button>
+      <button onclick="seisanOpenRyoshu()"   style="flex:1;min-width:110px;padding:11px 14px;background:var(--green);color:#fff;border:none;border-radius:12px;font-family:'Noto Sans JP',sans-serif;font-size:0.88rem;font-weight:700;cursor:pointer;">📝 領収書</button>
+      <button onclick="closeSeisanModal()"   style="width:100%;padding:13px;background:var(--red);color:#fff;border:none;border-radius:12px;font-family:'Noto Sans JP',sans-serif;font-size:1.05rem;font-weight:900;cursor:pointer;letter-spacing:0.1em;margin-top:4px;">終　了</button>
+    </div>
+  </div>
+
 </div>
 
 <!-- VOID / 取消モーダル -->
@@ -2428,20 +2467,14 @@ function savePaymentConfig(cfg) {
  */
 function applyPaymentConfig(cfg) {
   PAYMENT_METHODS.forEach(m => {
-    const btn = document.getElementById('payBtn-' + m.id);
-    if (btn) {
-      if (cfg[m.id]) {
-        btn.classList.remove('pay-disabled');
-        btn.style.pointerEvents = '';
-      } else {
-        btn.classList.add('pay-disabled');
-        btn.style.pointerEvents = 'none';
-      }
-    }
-    // 複数支払いモーダル内の行も連動
+    // 複数支払いモーダル内の行
     const splitRow = document.getElementById('splitRow-' + m.id);
-    if (splitRow) {
-      splitRow.style.display = cfg[m.id] ? '' : 'none';
+    if (splitRow) splitRow.style.display = cfg[m.id] ? '' : 'none';
+    // 精算モーダル内ボタン（現金は常時有効）
+    const seisanBtn = document.getElementById('seisanBtn-' + m.id);
+    if (seisanBtn && m.id !== 'cash') {
+      if (cfg[m.id]) { seisanBtn.classList.remove('pay-disabled'); seisanBtn.style.pointerEvents = ''; }
+      else            { seisanBtn.classList.add('pay-disabled');    seisanBtn.style.pointerEvents = 'none'; }
     }
   });
 }
@@ -2462,7 +2495,6 @@ const appState = {
   checkoutLock: false,
   cartDraftKey: 'pos_cart_draft',
   discountAmount: 0,
-  pendingPayType: null,
   taxRate: parseInt(localStorage.getItem('pos_taxRate') || '10'),
   currentMonth: new Date(),
   photoMode: false,
@@ -2772,18 +2804,19 @@ function _buildReceiptHTML(d, memberId) {
     const cfg = _loadStampCfg();
     if(mData) {
       const stamps = mData.stamps || 0;
-      const stampIcons = cfg.rewards.map(r => {
-        const filled = stamps >= r.count;
-        return `${filled ? r.emoji : '☆'} ${r.label}（${r.count}回）`;
-      }).join('<br>');
+      const displayCount = stamps % 10 === 0 && stamps > 0 ? 10 : stamps % 10;
+      const stampIcons = Array.from({length: 10}, (_,i) => i < displayCount ? '⭐' : '☆').join(' ');
       const nextReward = cfg.rewards.find(r => r.count > stamps);
-      const nextMsg = nextReward ? `あと${nextReward.count - stamps}回で ${nextReward.emoji}${nextReward.label}！` : '🎉 全特典達成！';
+      const nextMsg = nextReward
+        ? `あと <strong>${nextReward.count - stamps}回</strong> で ${nextReward.emoji}${nextReward.label}！`
+        : '🎉 全特典達成！おめでとうございます！';
       stampSection = `
-        <div style="border-top:1px dashed #ccc;margin:8px 0;padding-top:8px;">
-          <div style="text-align:center;font-size:0.72rem;color:#555;margin-bottom:4px;">🪪 会員番号</div>
-          <div style="text-align:center;font-family:monospace;font-size:0.85rem;font-weight:bold;margin-bottom:6px;">${memberId}</div>
-          <div style="text-align:center;font-size:0.78rem;margin-bottom:4px;">スタンプ ${stamps}個</div>
-          <div style="text-align:center;font-size:0.75rem;color:#e07000;">${nextMsg}</div>
+        <div style="border-top:1px dashed #ccc;margin:8px 0;padding-top:8px;text-align:center;">
+          <div style="font-size:0.72rem;color:#555;margin-bottom:3px;">🪪 会員番号</div>
+          <div style="font-family:monospace;font-size:1rem;font-weight:bold;letter-spacing:0.1em;margin-bottom:8px;">${memberId}</div>
+          <div style="font-size:0.75rem;color:#555;margin-bottom:4px;">スタンプ累計 <strong>${stamps}個</strong></div>
+          <div style="font-size:1.1rem;letter-spacing:2px;margin-bottom:5px;">${stampIcons}</div>
+          <div style="font-size:0.78rem;color:#e07000;">${nextMsg}</div>
         </div>`;
     } else if(memberId === 'NEW_PENDING') {
       stampSection = `
@@ -2811,42 +2844,11 @@ function _buildReceiptHTML(d, memberId) {
     <div style="display:flex;justify-content:space-between;font-weight:bold;font-size:1.05rem;padding:3px 4px;"><span>合計</span><span>¥${d.total.toLocaleString()}</span></div>
     <div style="text-align:center;font-size:0.85rem;margin:6px 0;">【${d.payment_label || d.payment_method}】</div>
     <div style="border-top:1px dashed #999;margin:6px 0;"></div>
-    ${stampSection}
     <div style="text-align:center;font-size:0.72rem;color:#999;margin-top:8px;">ありがとうございました<br><span style="font-size:0.65rem;">※会員番号は1年未利用で失効します</span></div>
+    ${stampSection}
+    <div style="text-align:center;font-size:0.65rem;color:#888;margin:8px 0 4px;padding:6px 4px;border-top:1px dashed #ccc;border-bottom:1px dashed #ccc;">📌 次回ご来店時は、このレシートをお持ちいただくか<br>会員番号をスタッフにお知らせください</div>
     ${cmSection}
   </div>`;
-}
-
-// ===== 会計モーダル内 会員入力 =====
-function _resetCheckoutMemberUI() {
-  const btn  = document.getElementById('checkoutMemberBtn');
-  const info = document.getElementById('checkoutMemberInfo');
-  if(btn)  { btn.textContent = '🪪 番号を入力する'; btn.style.background='rgba(245,166,35,0.08)'; btn.style.borderColor='rgba(245,166,35,0.25)'; btn.style.color='var(--muted)'; }
-  if(info) { info.style.display='none'; info.textContent=''; }
-}
-function openMemberFromCheckout() {
-  openMemberModal((memberId) => {
-    _lastMemberId = memberId;
-    const btn  = document.getElementById('checkoutMemberBtn');
-    const info = document.getElementById('checkoutMemberInfo');
-    if(!memberId) { _resetCheckoutMemberUI(); return; }
-    if(memberId === 'NEW') {
-      if(btn)  { btn.textContent='✨ 新規発行（会計後に番号を発行）'; btn.style.background='rgba(25,135,84,0.2)'; btn.style.borderColor='rgba(25,135,84,0.5)'; btn.style.color='#6ee5a0'; }
-      if(info) { info.style.display='block'; info.textContent='会計完了後にレシートへ番号が印刷されます'; }
-    } else {
-      const mem = _loadMembers()[memberId];
-      const stamps = mem ? (mem.stamps||0) : 0;
-      const cfg = _loadStampCfg();
-      const next = cfg.rewards.find(r => r.count > stamps);
-      const nextMsg = next ? `　あと${next.count - stamps}回で${next.emoji}${next.label}` : '　🎉 全特典達成！';
-      if(btn)  { btn.textContent=`🪪 ${memberId.slice(0,9)}…`; btn.style.background='rgba(245,166,35,0.2)'; btn.style.borderColor='rgba(245,166,35,0.5)'; btn.style.color='var(--gold)'; }
-      if(info) { info.style.display='block'; info.textContent=`スタンプ ${stamps}個${nextMsg}`; }
-    }
-  });
-}
-function clearCheckoutMember() {
-  _lastMemberId = null;
-  _resetCheckoutMemberUI();
 }
 
 // ===== 会員ボタン（伝票パネル・任意） =====
@@ -2959,6 +2961,252 @@ function _posVerGreater(a, b) {
     if((pa[i]||0) < (pb[i]||0)) return false;
   }
   return false;
+}
+
+// ===== 新・精算フロー（3ステップ） =====
+let _seisanCashInput = '';
+let _seisanTotal = 0;
+let _seisanTx = null;
+let _seisanPayType = null;
+let _seisanMemberId = null; // 印刷時まで保持
+
+function openSeisanModal() {
+  if (appState.cart.length === 0) { showToast('伝票が空です', 'warn'); return; }
+  const subtotal = appState.cart.reduce((a,b) => a+b.price, 0);
+  const discount = appState.discountAmount || 0;
+  const afterDiscount = Math.max(0, subtotal - discount);
+  const taxAmount = Math.round(afterDiscount * appState.taxRate / 100);
+  const total = afterDiscount + taxAmount;
+  _seisanTotal = total;
+
+  document.getElementById('seisanTotalDisp').textContent = '¥' + total.toLocaleString();
+  const bkd = discount > 0
+    ? `小計 ¥${subtotal.toLocaleString()} / 割引 -¥${discount.toLocaleString()} / 税 ¥${taxAmount.toLocaleString()}`
+    : `小計 ¥${subtotal.toLocaleString()} / 消費税(${appState.taxRate}%) ¥${taxAmount.toLocaleString()}`;
+  document.getElementById('seisanBreakdown').textContent = bkd;
+
+  const discountBtn = document.getElementById('seisanDiscountBtn');
+  discountBtn.textContent = discount > 0 ? `🏷 割引 -¥${discount.toLocaleString()} (変更)` : '🏷 割引を設定';
+
+  // 支払ボタンを設定に合わせてグレーアウト
+  const cfg = appState.paymentConfig;
+  ['card','paypay','linepay','ic','other','split'].forEach(id => {
+    const btn = document.getElementById('seisanBtn-' + id);
+    if (!btn) return;
+    if (cfg[id]) { btn.classList.remove('pay-disabled'); btn.style.pointerEvents = ''; }
+    else          { btn.classList.add('pay-disabled');    btn.style.pointerEvents = 'none'; }
+  });
+
+  showSeisanStep(1);
+  document.getElementById('seisanModal').classList.add('open');
+}
+
+function showSeisanStep(n) {
+  [1,2,3].forEach(i => {
+    const el = document.getElementById('seisanStep' + i);
+    if (el) el.style.display = (i === n) ? '' : 'none';
+  });
+}
+
+function openSeisanDiscount() {
+  document.querySelectorAll('.discount-opt-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('discountCustomInput').value = appState.discountAmount || '';
+  updateDiscountPreview(appState.discountAmount || 0);
+  const okBtn = document.querySelector('.discount-ok-btn');
+  okBtn.textContent = '割引を適用';
+  okBtn.onclick = () => {
+    const val = parseInt(document.getElementById('discountCustomInput').value) || 0;
+    appState.discountAmount = Math.max(0, val);
+    closeDiscountModal();
+    renderOrder();
+    okBtn.textContent = 'この金額で精算';
+    okBtn.onclick = applyDiscountAndCheckout;
+    openSeisanModal(); // 再表示して金額更新
+  };
+  document.getElementById('discountModal').classList.add('open');
+}
+
+function seisanSelectPayment(type) {
+  _seisanPayType = type;
+  if (type === '現金') {
+    _seisanCashInput = '';
+    document.getElementById('seisanCashDisplay').textContent = '0';
+    document.getElementById('seisanStep2Total').textContent = '¥' + _seisanTotal.toLocaleString();
+    const presets = [_seisanTotal, ...[1000,2000,5000,10000].filter(v => v > _seisanTotal)].slice(0,4);
+    document.getElementById('seisanCashPresets').innerHTML = presets.map(v =>
+      `<button onclick="seisanSetPreset(${v})" style="flex:1;padding:7px 4px;background:rgba(245,166,35,0.12);border:1px solid rgba(245,166,35,0.3);border-radius:8px;color:var(--gold);font-size:0.8rem;font-weight:700;cursor:pointer;font-family:'Noto Sans JP',sans-serif;white-space:nowrap;">¥${v.toLocaleString()}</button>`
+    ).join('');
+    showSeisanStep(2);
+  } else {
+    _executeSeisan(type, 0);
+  }
+}
+
+function openSeisanSplit() {
+  closeSeisanModal();
+  openSplitPayment();
+}
+
+function seisanTenkey(val) {
+  if (val === 'DEL') { _seisanCashInput = _seisanCashInput.slice(0,-1); }
+  else if (val === '00') { if (_seisanCashInput !== '') _seisanCashInput += '00'; }
+  else {
+    if (_seisanCashInput === '0') _seisanCashInput = val;
+    else _seisanCashInput += val;
+    if (_seisanCashInput.length > 7) _seisanCashInput = _seisanCashInput.slice(0,7);
+  }
+  const num = parseInt(_seisanCashInput) || 0;
+  document.getElementById('seisanCashDisplay').textContent = num > 0 ? '¥' + num.toLocaleString() : '0';
+}
+
+function seisanSetPreset(val) {
+  _seisanCashInput = String(val);
+  document.getElementById('seisanCashDisplay').textContent = '¥' + val.toLocaleString();
+}
+
+function seisanCashConfirm() {
+  const received = parseInt(_seisanCashInput) || 0;
+  if (received <= 0) { showToast('金額を入力してください', 'warn'); return; }
+  if (received < _seisanTotal) { showToast(`¥${(_seisanTotal - received).toLocaleString()} 不足しています`, 'warn'); return; }
+  _executeSeisan('現金', received);
+}
+
+function _executeSeisan(type, received) {
+  if (appState.checkoutLock) return;
+  if (appState.cart.length === 0) return;
+
+  const subtotal = appState.cart.reduce((a,b) => a+b.price, 0);
+  const discount = appState.discountAmount || 0;
+  const afterDiscount = Math.max(0, subtotal - discount);
+  const taxAmount = Math.round(afterDiscount * appState.taxRate / 100);
+  const total = afterDiscount + taxAmount;
+
+  appState.checkoutLock = true;
+  try {
+    const now = new Date();
+    const txId = getTxId();
+    const bizDate = getBusinessDate();
+    const payMethod = type === '現金' ? 'cash' : type === 'カード' ? 'card'
+      : type === 'PayPay' ? 'paypay' : type === 'LINE Pay' ? 'linepay'
+      : type === '交通系IC' ? 'ic' : 'other';
+
+    const tx = {
+      transaction_id: txId, datetime: now.toISOString(), business_date: bizDate,
+      payment_method: payMethod, payment_label: type,
+      items: appState.cart.map(i => ({
+        item_id: i.id, name: i.name, detail: i.detail, price: i.price,
+        quantity: i.quantity||1, itemType: i.itemType||'plate', fishKey: i.fishKey||'',
+      })),
+      subtotal, discount, tax_rate: appState.taxRate, tax_amount: taxAmount, total,
+      status: 'completed',
+    };
+
+    const log = getDailyLog(bizDate);
+    log.transactions.push(tx);
+    log.total_sales += total;
+    log.total_qty += appState.cart.reduce((a,b) => a+(b.quantity||1), 0);
+    saveDailyLog(log);
+
+    try {
+      let h = JSON.parse(localStorage.getItem('pos_history')||'[]');
+      h.push({ time: now.toLocaleString(), total, type,
+        items: appState.cart.map(i=>({name:i.name,detail:i.detail,price:i.price,itemType:i.itemType||'plate',fishKey:i.fishKey||''}))
+      });
+      localStorage.setItem('pos_history', JSON.stringify(h));
+    } catch(e) {}
+
+    appState.cart.forEach(cartItem => {
+      const master = masterData.find(m => m.id === cartItem.id);
+      if (master && typeof master.stock === 'number')
+        master.stock = Math.max(0, master.stock - (cartItem.quantity||1));
+    });
+    saveData();
+    localStorage.removeItem(appState.cartDraftKey);
+    appState.sessionTotal += total;
+    appState.sessionCount++;
+    appState.discountAmount = 0;
+    document.getElementById('statTotal').textContent = '¥' + appState.sessionTotal.toLocaleString();
+    document.getElementById('statCount').textContent = appState.sessionCount;
+
+    _seisanTx = tx;
+    _receiptData = tx;
+
+    // 会員スタンプ処理（先に実行してから正式なIDを保存）
+    if (_lastMemberId) {
+      if (_lastMemberId === 'NEW') {
+        _lastMemberId = applyMemberStamp(null, true); // 新規発行→実IDが返る
+      } else {
+        applyMemberStamp(_lastMemberId, false);
+      }
+    }
+    _seisanMemberId = _lastMemberId; // スタンプ処理後の正式IDを保存
+
+    appState.cart = [];
+    renderOrder(); // ← ここで_lastMemberIdがnullになるが_seisanMemberIdは保持済み
+    renderProducts();
+
+    // Step3 表示
+    document.getElementById('seisanStep3Label').textContent = type + 'でのお会計';
+    document.getElementById('seisanStep3Total').textContent = '¥' + total.toLocaleString();
+    const discountNote = discount > 0
+      ? `割引 ¥${discount.toLocaleString()} / 消費税 ¥${taxAmount.toLocaleString()}`
+      : `消費税 ¥${taxAmount.toLocaleString()} 込`;
+    document.getElementById('seisanStep3Sub').textContent = discountNote;
+
+    const changeArea = document.getElementById('seisanChangeArea');
+    if (type === '現金' && received > 0) {
+      const change = received - total;
+      document.getElementById('seisanStep3Icon').textContent = change === 0 ? '✅' : '💴';
+      document.getElementById('seisanChangeAmt').textContent = '¥' + change.toLocaleString();
+      document.getElementById('seisanChangeDetail').textContent =
+        `お預かり ¥${received.toLocaleString()}　合計 ¥${total.toLocaleString()}`;
+      changeArea.style.display = 'block';
+    } else {
+      document.getElementById('seisanStep3Icon').textContent = '✅';
+      changeArea.style.display = 'none';
+    }
+    showSeisanStep(3);
+
+  } catch(e) {
+    console.error('[POS] seisan failed:', e);
+    showToast('保存に失敗しました。もう一度お試しください', 'error');
+    appState.checkoutLock = false;
+    return;
+  }
+  setTimeout(() => { appState.checkoutLock = false; }, 1500);
+}
+
+function seisanPrintReceipt() {
+  if (_seisanTx) {
+    _receiptData = _seisanTx;
+    const html = _buildReceiptHTML(_seisanTx, _seisanMemberId);
+    const area = document.getElementById('receiptPrintArea');
+    area.innerHTML = html;
+    window.print();
+    setTimeout(() => { area.innerHTML = ''; }, 1000);
+  }
+}
+function seisanOpenRyoshu() {
+  if (_seisanTx) {
+    _receiptData = _seisanTx;
+    document.getElementById('ryoshuAmount').textContent = '¥' + _seisanTx.total.toLocaleString();
+    closeSeisanModal();
+    document.getElementById('ryoshuModal').classList.add('open');
+  }
+}
+function closeSeisanModal() {
+  document.getElementById('seisanModal').classList.remove('open');
+  _seisanTx = null;
+  _seisanCashInput = '';
+  _seisanMemberId = null;
+  _lastMemberId = null;
+  const btn = document.getElementById('memberOrderBtn');
+  if (btn) {
+    btn.textContent = '🪪 会員スタンプを使う（任意）';
+    btn.style.background  = 'rgba(245,166,35,0.08)';
+    btn.style.borderColor = 'rgba(245,166,35,0.25)';
+    btn.style.color       = 'var(--muted)';
+  }
 }
 
 // ===== TOAST NOTIFICATION =====
@@ -3304,8 +3552,7 @@ function renderOrder() {
     document.getElementById('taxRow').style.display = 'none';
     document.getElementById('totalDivider').style.display = 'none';
     if(memberArea) memberArea.style.display = 'none';
-    // カート空になったら会員リセット
-    _lastMemberId = null;
+    // カート空になったら会員UIリセット（_lastMemberIdはcloseSeisanModalでリセット）
     const btn = document.getElementById('memberOrderBtn');
     if(btn) {
       btn.textContent = '🪪 会員スタンプを使う（任意）';
@@ -3367,24 +3614,7 @@ function clearOrder() {
 }
 
 // ===== DISCOUNT MODAL =====
-function openDiscountThenCheckout(type) {
-  if (appState.cart.length === 0) {
-    showToast('伝票が空です', 'warn');
-    return;
-  }
-
-  appState.pendingPayType = type;
-
-  document.querySelectorAll('.discount-opt-btn')
-    .forEach(b => b.classList.remove('active'));
-
-  document.getElementById('discountCustomInput').value =
-    appState.discountAmount || '';
-
-  updateDiscountPreview(appState.discountAmount || 0);
-
-  document.getElementById('discountModal').classList.add('open');
-}function closeDiscountModal() {
+function closeDiscountModal() {
   document.getElementById('discountModal').classList.remove('open');
 }
 function setDiscountPreset(val) {
@@ -3412,147 +3642,22 @@ function updateDiscountPreview(val) {
     el.style.color = 'var(--muted)';
   }
 }
+// 割引のみ適用（精算は seisanModal で行う）
 function applyDiscountAndCheckout() {
   const val = parseInt(document.getElementById('discountCustomInput').value) || 0;
   appState.discountAmount = Math.max(0, val);
   closeDiscountModal();
   renderOrder();
-  // 会員モーダルを挟まず直接会計（会員は伝票パネルの🪪ボタンで任意設定）
-  doCheckout(appState.pendingPayType);
 }
 function openDiscountModal() {
   if (appState.cart.length === 0) return;
-  openDiscountThenCheckout(null);
-  // Override apply button to just apply without checkout
-  document.querySelector('.discount-ok-btn').textContent = '割引を適用';
-  document.querySelector('.discount-ok-btn').onclick = () => {
-    const val = parseInt(document.getElementById('discountCustomInput').value) || 0;
-    appState.discountAmount = Math.max(0, val);
-    closeDiscountModal();
-    renderOrder();
-    // Restore button
-    document.querySelector('.discount-ok-btn').textContent = 'この金額で精算';
-    document.querySelector('.discount-ok-btn').onclick = applyDiscountAndCheckout;
-  };
-}
-
-// ===== CHECKOUT =====
-function doCheckout(type) {
-  if (!type) return;
-  // ── ガード ──────────────────────────────
-  if (appState.checkoutLock) return;
-  if (appState.cart.length === 0) {
-    showToast('伝票が空です', 'warn'); return;
-  }
-  const subtotal = appState.cart.reduce((a,b) => a+b.price, 0);
-  const discount = appState.discountAmount || 0;
-  const afterDiscount = Math.max(0, subtotal - discount);
-  const taxAmount = Math.round(afterDiscount * appState.taxRate / 100);
-  const total = afterDiscount + taxAmount;
-  if (!total || isNaN(total) || total <= 0) {
-    showToast('合計金額が正しくありません', 'error'); return;
-  }
-
-  appState.checkoutLock = true;
-
-  try {
-    const now = new Date();
-    const txId = getTxId();
-    const bizDate = getBusinessDate();
-    const payMethod = type === '現金' ? 'cash'
-      : type === 'カード' ? 'card'
-      : type === 'PayPay' ? 'paypay'
-      : type === 'LINE Pay' ? 'linepay'
-      : type === '交通系IC' ? 'ic'
-      : 'other';
-
-    const tx = {
-      transaction_id: txId,
-      datetime: now.toISOString(),
-      business_date: bizDate,
-      payment_method: payMethod,
-      payment_label: type,
-      items: appState.cart.map(i => ({
-        item_id: i.id,
-        name: i.name,
-        detail: i.detail,
-        price: i.price,
-        quantity: i.quantity || 1,
-        itemType: i.itemType || 'plate',
-        fishKey: i.fishKey || '',
-      })),
-      subtotal,
-      discount,
-      tax_rate: appState.taxRate,
-      tax_amount: taxAmount,
-      total,
-      status: 'completed',
-    };
-
-    const log = getDailyLog(bizDate);
-    log.transactions.push(tx);
-    log.total_sales += total;
-    log.total_qty += appState.cart.reduce((a,b) => a + (b.quantity||1), 0);
-    saveDailyLog(log);
-
-    try {
-      let h = JSON.parse(localStorage.getItem('pos_history') || '[]');
-      h.push({ time: now.toLocaleString(), total, type,
-        items: appState.cart.map(i=>({name:i.name,detail:i.detail,price:i.price,itemType:i.itemType||'plate',fishKey:i.fishKey||''}))
-      });
-      localStorage.setItem('pos_history', JSON.stringify(h));
-    } catch(e) {}
-
-    appState.cart.forEach(cartItem => {
-      const master = masterData.find(m => m.id === cartItem.id);
-      if (master && typeof master.stock === 'number') {
-        master.stock = Math.max(0, master.stock - (cartItem.quantity || 1));
-      }
-    });
-    saveData();
-
-    localStorage.removeItem(appState.cartDraftKey);
-
-    appState.sessionTotal += total;
-    appState.sessionCount++;
-    appState.discountAmount = 0;
-    document.getElementById('statTotal').textContent = `¥${appState.sessionTotal.toLocaleString()}`;
-    document.getElementById('statCount').textContent = appState.sessionCount;
-
-    document.getElementById('checkoutTypeLabel').textContent = `${type}でのお会計`;
-    document.getElementById('checkoutTotalDisp').textContent = `¥${total.toLocaleString()}`;
-    const discountNote = discount > 0 ? ` (割引¥${discount.toLocaleString()} / 税¥${taxAmount.toLocaleString()})` : ` (消費税¥${taxAmount.toLocaleString()}込)`;
-    document.getElementById('checkoutItemCount').textContent = `${appState.cart.length}品` + discountNote;
-
-    // お釣り計算（現金のみ表示）
-    if (type === '現金') {
-      openChangeCalc(total, tx);
-    } else {
-      document.getElementById('changeCalcSection').style.display = 'none';
-    }
-
-    // レシート・領収書ボタン表示
-    document.getElementById('receiptBtn').style.display = 'inline-block';
-    document.getElementById('ryoshuBtn').style.display = 'inline-block';
-    _receiptData = tx;
-
-    // 会員エリアリセット（モーダル内で選択させる）
-    _resetCheckoutMemberUI();
-
-    document.getElementById('checkoutModal').classList.add('open');
-
-    appState.cart = [];
-    renderOrder();
-    renderProducts();
-
-  } catch(e) {
-    console.error('[POS] doCheckout failed:', e);
-    showToast('保存に失敗しました。もう一度お試しください', 'error');
-    appState.checkoutLock = false;
-    return;
-  }
-
-  setTimeout(() => { appState.checkoutLock = false; }, 1500);
+  document.querySelectorAll('.discount-opt-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('discountCustomInput').value = appState.discountAmount || '';
+  updateDiscountPreview(appState.discountAmount || 0);
+  const okBtn = document.querySelector('.discount-ok-btn');
+  okBtn.textContent = '割引を適用';
+  okBtn.onclick = applyDiscountAndCheckout;
+  document.getElementById('discountModal').classList.add('open');
 }
 
 function cancelTransaction(txId, bizDate) {
@@ -3577,17 +3682,8 @@ function cancelTransaction(txId, bizDate) {
 }
 
 function closeCheckout() {
-  // 会員スタンプ処理（閉じる時に実行）
-  if(_lastMemberId) {
-    if(_lastMemberId === 'NEW') {
-      _lastMemberId = applyMemberStamp(null, true);
-    } else {
-      applyMemberStamp(_lastMemberId, false);
-    }
-  }
   document.getElementById('checkoutModal').classList.remove('open');
   _lastMemberId = null;
-  _resetCheckoutMemberUI();
   const btn = document.getElementById('memberOrderBtn');
   if(btn) {
     btn.textContent = '🪪 会員スタンプを使う（任意）';
@@ -3730,12 +3826,17 @@ function doSplitCheckout(labelStr, splits) {
     document.getElementById('checkoutTotalDisp').textContent = `¥${total.toLocaleString()}`;
     const discountNote = discount > 0 ? ` (割引¥${discount.toLocaleString()} / 税¥${taxAmount.toLocaleString()})` : ` (消費税¥${taxAmount.toLocaleString()}込)`;
     document.getElementById('checkoutItemCount').textContent = labelStr + discountNote;
-    document.getElementById('changeCalcSection').style.display = 'none';
     document.getElementById('receiptBtn').style.display = 'inline-block';
     document.getElementById('ryoshuBtn').style.display = 'inline-block';
     _receiptData = tx;
-    // 会員エリアリセット（モーダル内で選択させる）
-    _resetCheckoutMemberUI();
+    // 会員スタンプ処理（split）
+    if(_lastMemberId) {
+      if(_lastMemberId === 'NEW') {
+        _lastMemberId = applyMemberStamp(null, true);
+      } else {
+        applyMemberStamp(_lastMemberId, false);
+      }
+    }
     document.getElementById('checkoutModal').classList.add('open');
     appState.cart = [];
     renderOrder();
@@ -4650,55 +4751,6 @@ function importAllData() {
   input.click();
 }
 
-
-// ===== お釣り計算 =====
-let _lastCheckoutTotal = 0;
-let _lastCheckoutTx = null;
-
-function openChangeCalc(total, tx) {
-  _lastCheckoutTotal = total;
-  _lastCheckoutTx = tx;
-  const section = document.getElementById('changeCalcSection');
-  const input = document.getElementById('cashReceivedInput');
-  const display = document.getElementById('changeDisplay');
-  section.style.display = 'block';
-  input.value = '';
-  display.textContent = '金額を入力してください';
-  display.style.color = 'var(--muted)';
-
-  // プリセットボタン生成（合計より大きいキリのいい金額）
-  const presets = [1000, 2000, 5000, 10000].filter(v => v >= total);
-  // ちょうどの金額も追加
-  const presetsEl = document.getElementById('cashPresets');
-  const allPresets = [total, ...presets].filter((v,i,a) => a.indexOf(v) === i).slice(0,5);
-  presetsEl.innerHTML = allPresets.map(v =>
-    `<button onclick="setCashPreset(${v})" style="padding:6px 12px;background:var(--card);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:0.85rem;font-weight:700;cursor:pointer;font-family:'Noto Sans JP',sans-serif;">¥${v.toLocaleString()}</button>`
-  ).join('');
-}
-
-function setCashPreset(val) {
-  document.getElementById('cashReceivedInput').value = val;
-  calcChange();
-}
-
-function calcChange() {
-  const received = parseInt(document.getElementById('cashReceivedInput').value) || 0;
-  const total = _lastCheckoutTotal;
-  const display = document.getElementById('changeDisplay');
-  if (received <= 0) {
-    display.textContent = '金額を入力してください';
-    display.style.color = 'var(--muted)';
-    return;
-  }
-  const change = received - total;
-  if (change < 0) {
-    display.innerHTML = `<span style="color:#ff8080;">⚠️ ¥${Math.abs(change).toLocaleString()} 不足</span>`;
-  } else if (change === 0) {
-    display.innerHTML = `<span style="color:var(--green);font-size:1.1rem;font-weight:900;">ぴったり！</span>`;
-  } else {
-    display.innerHTML = `<div style="font-size:0.75rem;color:var(--muted);">お釣り</div><div style="font-size:2rem;font-weight:900;color:var(--accent);font-family:'Orbitron',sans-serif;">¥${change.toLocaleString()}</div>`;
-  }
-}
 
 // ===== VOID / 取消 =====
 function openVoidModal() {
