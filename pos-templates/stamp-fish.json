@@ -1,0 +1,16 @@
+{
+  "meta": {
+    "name": "鮮魚居酒屋テンプレート",
+    "version": "1.0.0",
+    "description": "魚屋・鮮魚居酒屋専用スタンプ設定"
+  },
+  "stamp_config": {
+    "rewards": [
+      { "count": 3,  "label": "今日の刺身1切",    "emoji": "🐟" },
+      { "count": 5,  "label": "大将おすすめ1品",  "emoji": "👨‍🍳" },
+      { "count": 10, "label": "おまかせ刺身盛り", "emoji": "🍣" }
+    ],
+    "expire_days": 60
+  },
+  "receipt_cm": "🐟 本日の鮮魚は豊洲直送！\n毎朝仕入れの新鮮な魚をご提供"
+}
