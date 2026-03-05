@@ -1,0 +1,16 @@
+{
+  "meta": {
+    "name": "春テンプレート",
+    "version": "1.0.0",
+    "description": "春の桜シーズン向けスタンプ設定"
+  },
+  "stamp_config": {
+    "rewards": [
+      { "count": 3,  "label": "桜エール1杯",    "emoji": "🌸" },
+      { "count": 5,  "label": "春野菜の一品",   "emoji": "🌿" },
+      { "count": 10, "label": "花見コース優先",  "emoji": "🎎" }
+    ],
+    "expire_days": 60
+  },
+  "receipt_cm": "🌸 春の限定メニュー好評提供中！\nLINE公式で最新情報をチェック"
+}
