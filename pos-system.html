@@ -1760,6 +1760,18 @@ body {
 .stamp-display { display: flex; gap: 6px; flex-wrap: wrap; margin: 8px 0; }
 .stamp-icon { font-size: 1.4rem; }
 
+/* ===== ランキング ===== */
+.rank-row { display:flex; align-items:center; gap:12px; padding:10px 12px; background:var(--panel); border:1px solid var(--border); border-radius:10px; margin-bottom:8px; }
+.rank-num { font-family:'Orbitron',sans-serif; font-size:1.1rem; font-weight:900; width:28px; text-align:center; flex-shrink:0; }
+.rank-num.gold   { color:#ffd700; }
+.rank-num.silver { color:#c0c0c0; }
+.rank-num.bronze { color:#cd7f32; }
+.rank-num.normal { color:var(--muted); }
+.rank-id   { font-family:monospace; font-size:0.9rem; color:var(--gold); flex:1; letter-spacing:0.06em; }
+.rank-count { font-size:0.88rem; font-weight:700; color:var(--accent); white-space:nowrap; }
+.rank-bar-wrap { width:100%; height:4px; background:rgba(255,255,255,0.08); border-radius:2px; margin-top:4px; }
+.rank-bar { height:4px; border-radius:2px; background:var(--accent); }
+
 /* ===== @media print (レシート) ===== */
 @media print {
   body > *:not(#receiptPrintArea) { display: none !important; }
@@ -1896,7 +1908,7 @@ body {
   <button class="nav-btn" onclick="openDailyClose()"><span class="nav-icon">🔒</span>日次締め</button>
   <button class="nav-btn" onclick="openMonthly()"><span class="nav-icon">📅</span>月次</button>
   <button class="nav-btn" onclick="openInventory()"><span class="nav-icon">📦</span>在庫</button>
-  <button class="nav-btn" onclick=""><span class="nav-icon">📈</span>分析</button>
+  <button class="nav-btn" onclick="openRanking()"><span class="nav-icon">🏆</span>常連</button>
   <button class="nav-btn" onclick="openSettings()"><span class="nav-icon">⚙️</span>設定</button>
 </div>
 
@@ -1976,6 +1988,7 @@ body {
     </div>
     <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center;">
       <button class="checkout-close-btn" onclick="printReceiptNow()" id="receiptBtn" style="background:var(--blue);display:none;font-size:0.9rem;padding:10px 18px;">🖨 レシート印刷</button>
+      <button class="checkout-close-btn" onclick="printReceiptBluetooth()" id="btReceiptBtn" style="background:#1a3a2a;border:1px solid rgba(25,135,84,0.5);color:#6ee5a0;display:none;font-size:0.82rem;padding:8px 14px;">📡 BT印刷</button>
       <button class="checkout-close-btn" onclick="openRyoshuModal()" id="ryoshuBtn" style="background:var(--green);display:none;font-size:0.9rem;padding:10px 18px;">📝 領収書</button>
       <button class="checkout-close-btn" onclick="closeCheckout()" style="font-size:0.9rem;padding:10px 18px;">閉じる</button>
     </div>
@@ -2162,6 +2175,21 @@ body {
     <div style="padding:12px 16px;border-top:1px solid var(--border);display:flex;gap:8px;">
       <button class="modal-cancel" onclick="closeInventory()" style="flex:1;">閉じる</button>
       <button onclick="saveInventory()" style="flex:2;padding:12px;background:var(--green);color:#fff;border:none;border-radius:10px;font-family:'Noto Sans JP',sans-serif;font-size:0.9rem;font-weight:700;cursor:pointer;">✅ 保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- RANKING MODAL -->
+<div class="modal-overlay" id="rankingModal">
+  <div class="modal-box" style="width:440px;max-height:85vh;display:flex;flex-direction:column;">
+    <div class="modal-header" style="justify-content:space-between;">
+      <div style="font-size:1rem;font-weight:900;">🏆 今月の常連ランキング</div>
+      <button onclick="closeRanking()" style="background:none;border:none;color:var(--muted);font-size:1.4rem;cursor:pointer;">✕</button>
+    </div>
+    <div style="padding:8px 16px 4px;font-size:0.72rem;color:var(--muted);">会員番号下4桁で表示（プライバシー保護）　※今月来店分</div>
+    <div id="rankingBody" style="flex:1;overflow-y:auto;padding:10px 16px;"></div>
+    <div style="padding:12px 16px;border-top:1px solid var(--border);">
+      <button class="modal-cancel" onclick="closeRanking()" style="width:100%;">閉じる</button>
     </div>
   </div>
 </div>
@@ -2821,6 +2849,163 @@ function openMemberFromOrder() {
       btn.style.color       = 'var(--muted)';
     }
   });
+}
+
+// ===== 常連ランキング =====
+function openRanking() {
+  const body = document.getElementById('rankingBody');
+  const m = _loadMembers();
+  const now = new Date();
+  const thisMonth = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+  const visitMap = {};
+  try {
+    const logs = JSON.parse(localStorage.getItem('pos_daily_logs') || '{}');
+    Object.keys(logs).filter(d => d.startsWith(thisMonth)).forEach(date => {
+      const log = logs[date];
+      if(log && log.transactions) {
+        log.transactions.filter(t => t.status !== 'cancelled' && t.member_id).forEach(t => {
+          visitMap[t.member_id] = (visitMap[t.member_id] || 0) + 1;
+        });
+      }
+    });
+  } catch(e) {}
+  let rankData = Object.entries(visitMap).map(([id, count]) => ({ id, count }));
+  if(rankData.length === 0) {
+    rankData = Object.entries(m)
+      .filter(([id, d]) => d.last_visit && d.last_visit.startsWith(thisMonth))
+      .map(([id, d]) => ({ id, count: 1 }));
+  }
+  rankData.sort((a,b) => b.count - a.count);
+  const top = rankData.slice(0, 20);
+  const maxCount = top[0] ? top[0].count : 1;
+  if(top.length === 0) {
+    body.innerHTML = `<div style="text-align:center;padding:40px 20px;color:var(--muted);font-size:0.85rem;">今月の来店データがありません<br><span style="font-size:0.75rem;">会員スタンプを使って会計すると表示されます</span></div>`;
+  } else {
+    const medals = ['🥇','🥈','🥉'];
+    const rankClass = ['gold','silver','bronze'];
+    body.innerHTML = `
+      <div style="text-align:center;font-size:0.78rem;color:var(--muted);margin-bottom:12px;">${now.getMonth()+1}月 来店回数ランキング（上位${top.length}名）</div>
+      ${top.map((r,i) => {
+        const shortId = r.id.slice(-4);
+        const medal = medals[i] || '';
+        const cls = rankClass[i] || 'normal';
+        const barW = Math.round(r.count / maxCount * 100);
+        const stamps = m[r.id] ? (m[r.id].stamps || 0) : '?';
+        return `<div class="rank-row">
+          <div class="rank-num ${cls}">${medal || (i+1)}</div>
+          <div style="flex:1;">
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <div class="rank-id">****-****-${shortId}</div>
+              <div class="rank-count">${r.count}回</div>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-top:2px;">
+              <div class="rank-bar-wrap"><div class="rank-bar" style="width:${barW}%"></div></div>
+              <div style="font-size:0.7rem;color:var(--muted);margin-left:8px;white-space:nowrap;">通算${stamps}pt</div>
+            </div>
+          </div>
+        </div>`;
+      }).join('')}
+      <div style="text-align:center;font-size:0.7rem;color:var(--muted);margin-top:12px;">※番号下4桁のみ表示。個人情報は保存していません。</div>`;
+  }
+  document.getElementById('rankingModal').classList.add('open');
+}
+function closeRanking() {
+  document.getElementById('rankingModal').classList.remove('open');
+}
+
+// ===== Bluetooth印刷 (Android Chrome専用) =====
+function _isAndroid() { return /Android/i.test(navigator.userAgent); }
+function _initBtButton() {
+  const btn = document.getElementById('btReceiptBtn');
+  if(!btn) return;
+  btn.style.display = (_isAndroid() && navigator.bluetooth) ? 'inline-block' : 'none';
+}
+async function printReceiptBluetooth() {
+  if(!_receiptData) return;
+  if(!navigator.bluetooth) { showToast('このブラウザはBluetooth印刷に対応していません', 'warn'); return; }
+  try {
+    showToast('プリンターを検索中...', 'info');
+    const device = await navigator.bluetooth.requestDevice({
+      filters: [{ services: ['000018f0-0000-1000-8000-00805f9b34fb'] }],
+      optionalServices: ['000018f0-0000-1000-8000-00805f9b34fb']
+    });
+    const server  = await device.gatt.connect();
+    const service = await server.getPrimaryService('000018f0-0000-1000-8000-00805f9b34fb');
+    const char    = await service.getCharacteristic('00002af1-0000-1000-8000-00805f9b34fb');
+    const text    = _buildReceiptText(_receiptData, _lastMemberId);
+    const data    = new TextEncoder().encode(text);
+    for(let i = 0; i < data.length; i += 20) {
+      await char.writeValue(data.slice(i, i + 20));
+      await new Promise(r => setTimeout(r, 30));
+    }
+    device.gatt.disconnect();
+    showToast('✅ 印刷完了！', 'success');
+  } catch(e) {
+    const msg = e.name === 'NotFoundError' ? 'プリンターが見つかりませんでした'
+              : e.name === 'SecurityError'  ? 'Bluetooth権限が拒否されました'
+              : `BT印刷失敗: ${e.message}`;
+    showToast(msg, 'error');
+  }
+}
+function _buildReceiptText(d, memberId) {
+  const si = appState.shopInfo || {};
+  const paperW = _getPaperWidth() === '80' ? 32 : 24;
+  const line = '-'.repeat(paperW);
+  const center = s => ' '.repeat(Math.max(0, Math.floor((paperW - s.length) / 2))) + s;
+  const rjust  = (l, r) => l + ' '.repeat(Math.max(1, paperW - l.length - r.length)) + r;
+  const now = new Date(d.datetime);
+  let lines = [
+    center(si.name || 'Fish POS Pro'),
+    si.address ? center(si.address) : '',
+    si.tel ? center('TEL: ' + si.tel) : '',
+    center(now.toLocaleString('ja-JP')),
+    center('No.' + d.transaction_id), line,
+    ...d.items.map(i => rjust(i.name.slice(0, paperW-8), '¥' + i.price.toLocaleString())),
+    line,
+    rjust('小計', '¥' + d.subtotal.toLocaleString()),
+    d.discount > 0 ? rjust('割引', '-¥' + d.discount.toLocaleString()) : '',
+    rjust(`消費税(${d.tax_rate}%)`, '¥' + d.tax_amount.toLocaleString()), line,
+    rjust('【合計】', '¥' + d.total.toLocaleString()),
+    center(d.payment_label || d.payment_method), line,
+  ];
+  if(memberId && memberId !== 'NEW') {
+    const mem = _loadMembers()[memberId];
+    if(mem) {
+      const cfg = _loadStampCfg();
+      const stamps = mem.stamps || 0;
+      const next = cfg.rewards.find(r => r.count > stamps);
+      lines.push(center('-- 会員 --'), center(memberId), center(`スタンプ ${stamps}個`));
+      if(next) lines.push(center(`あと${next.count - stamps}回で${next.label}!`));
+      lines.push(line);
+    }
+  }
+  const cm = _getReceiptCM();
+  if(cm) { lines.push(...cm.split('\n').map(l => center(l)), line); }
+  lines.push(center('ありがとうございました'), '', '', '');
+  return lines.filter(l => l != null).join('\n') + '\n\n\n\x1B\x69';
+}
+
+// ===== スタンプテンプレート配信 =====
+function _tmplBtnStyle() {
+  return 'width:100%;padding:9px;background:rgba(245,166,35,0.1);border:1px solid rgba(245,166,35,0.3);border-radius:8px;color:var(--gold);font-family:\'Noto Sans JP\',sans-serif;font-size:0.82rem;font-weight:700;cursor:pointer;text-align:left;margin-bottom:6px;';
+}
+async function applyStampTemplate(name) {
+  const msgEl = document.getElementById('tmplMsg');
+  const BASE = 'https://raw.githubusercontent.com/aomilivestockfarming-pixel/fish-pos-pro/main/pos-templates/';
+  if(msgEl) { msgEl.style.display='block'; msgEl.textContent='取得中...'; msgEl.style.color='var(--muted)'; }
+  try {
+    const res = await fetch(BASE + name + '.json?_=' + Date.now());
+    if(!res.ok) throw new Error('ファイルが見つかりません');
+    const data = await res.json();
+    if(data.stamp_config) _saveStampCfg(data.stamp_config);
+    if(data.receipt_cm)   localStorage.setItem(CM_KEY, data.receipt_cm);
+    showToast(`✅ ${data.meta?.name || name} を適用しました`, 'success');
+    if(msgEl) { msgEl.textContent = `✅ ${data.meta?.name || name} を適用。設定を閉じて再度開くと反映されます。`; msgEl.style.color='#6ee5a0'; }
+    closeSettings();
+    setTimeout(() => openSettings(), 150);
+  } catch(e) {
+    if(msgEl) { msgEl.textContent = `⚠️ 取得失敗: ${e.message}`; msgEl.style.color='#ff8a8a'; }
+  }
 }
 
 function saveStampConfig() {
@@ -3488,6 +3673,7 @@ function doCheckout(type) {
     document.getElementById('receiptBtn').style.display = 'inline-block';
     document.getElementById('ryoshuBtn').style.display = 'inline-block';
     _receiptData = tx;
+    _initBtButton();
 
     // 会員スタンプ処理
     if(_lastMemberId) {
@@ -3685,6 +3871,7 @@ function doSplitCheckout(labelStr, splits) {
     document.getElementById('ryoshuBtn').style.display = 'inline-block';
     _receiptData = tx;
     // 会員スタンプ処理（split）
+    _initBtButton();
     if(_lastMemberId) {
       if(_lastMemberId === 'NEW') {
         _lastMemberId = applyMemberStamp(null, true);
@@ -3908,6 +4095,20 @@ function renderSettingsBody() {
     </div>
   `;
   body.appendChild(memberSection);
+
+  // ── スタンプテンプレート配信 ──────────────────────────────────────
+  const menuPackSection = document.createElement('div');
+  menuPackSection.style.cssText = 'margin:16px 0;padding:14px;background:rgba(255,255,255,0.05);border-radius:10px;border:1px solid rgba(255,255,255,0.1);';
+  menuPackSection.innerHTML = `
+    <div style="font-size:0.8rem;font-weight:900;color:var(--accent);margin-bottom:6px;letter-spacing:0.06em;">🎁 スタンプテンプレート配信</div>
+    <div style="font-size:0.75rem;color:var(--muted);margin-bottom:10px;">ワンタップでスタンプ特典＋レシートCMを切り替えます</div>
+    <button onclick="applyStampTemplate('stamp-standard')"  style="${_tmplBtnStyle()}">🍺 標準（居酒屋定番）</button>
+    <button onclick="applyStampTemplate('stamp-spring')"    style="${_tmplBtnStyle()}">🌸 春テンプレート</button>
+    <button onclick="applyStampTemplate('stamp-halloween')" style="${_tmplBtnStyle()}">🎃 ハロウィン</button>
+    <button onclick="applyStampTemplate('stamp-fish')"      style="${_tmplBtnStyle()}">🐟 鮮魚居酒屋</button>
+    <div id="tmplMsg" style="display:none;font-size:0.75rem;margin-top:8px;padding:6px 10px;border-radius:8px;background:rgba(255,255,255,0.05);"></div>
+  `;
+  body.appendChild(menuPackSection);
 
   // ── サンプルデータ管理 ────────────────────────────────────────────
   const sampleSection = document.createElement('div');
