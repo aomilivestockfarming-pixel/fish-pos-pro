@@ -2013,6 +2013,8 @@ global.bootstrap=bootstrap;
                                     <option value="規格外・トリミング">規格外・トリミング</option>
                                     <option value="鮮度劣化">鮮度劣化・傷み</option>
                                     <option value="加工ミス">加工ミス</option>
+                                    <option value="破損">破損・落下</option>
+                                    <option value="返品・クレーム">返品・クレーム</option>
                                     <option value="その他">その他</option>
                                 </select>
                                 <label class="form-label" for="lossDays">保存予定日数 <span class="fdp-tip-icon" tabindex="0" role="tooltip" aria-label="この魚を何日間保存する予定かを入力。推奨保存日数より長いと廃棄リスクが急上昇します。「基準値」ボタンでDB推奨値を自動入力できます。">?<span class="fdp-tip-body">この魚を何日間保存する予定かを入力。推奨保存日数より長いと廃棄リスクが急上昇します。「基準値」ボタンでDB推奨値を自動入力できます。</span></span></label>
@@ -2261,6 +2263,16 @@ global.bootstrap=bootstrap;
                         </div>
                     </div>
                 </div><!-- /row (Fix v2.0.6) -->
+
+                <!-- ===== 月次推移グラフ ===== -->
+                <div class="row mt-3">
+                    <div class="col-12">
+                        <div class="card shadow-sm border-0 p-3">
+                            <h5 class="fw-bold text-purple mb-3"><i class="bi bi-calendar3"></i> 月次推移トレンド（直近6ヶ月）</h5>
+                            <div style="height:220px;"><canvas id="monthlyTrendChart"></canvas></div>
+                        </div>
+                    </div>
+                </div>
             </div><!-- /tabAnalytics -->
 
             <div class="tab-pane fade" id="tabData" role="tabpanel" aria-labelledby="tab-btn-data">
@@ -2328,15 +2340,47 @@ global.bootstrap=bootstrap;
 
                     <!-- ===== POS連携（Fish POS Pro 取込） ===== -->
                     <div class="col-12 mb-4">
-                        <div class="card p-3 shadow-sm border-0" style="border-left:4px solid #fd7e14 !important; border-left-width:4px !important;">
+                        <div class="card p-3 shadow-sm border-0" style="border-left:4px solid #fd7e14 !important;">
                             <h5 class="fw-bold mb-1" style="color:#fd7e14;"><i class="bi bi-cash-register"></i> POS取込 — Fish POS Pro 連携</h5>
-                            <p class="text-muted small mb-3">
-                                Fish POS Pro の「🔒 日次締め」からダウンロードした <code>fdp_pos_YYYYMMDD.json</code> を選択してください。<br>
-                                売上データが帳簿に追記されます（重複チェックあり）。
-                            </p>
+
+                            <!-- 直接受信エリア -->
+                            <div class="p-3 rounded mb-3" style="background:#fff8f0;border:2px solid #fd7e14;">
+                                <div class="fw-bold mb-2" style="color:#fd7e14;font-size:0.95rem;">📡 POSから直接受信（Wi-Fi）</div>
+                                <!-- 入力前 -->
+                                <div id="fdpReceiveIdle">
+                                    <div class="text-muted small mb-2">POS Pro の日次締め画面に表示された<strong>4桁コード</strong>を入力してください</div>
+                                    <div class="d-flex gap-2 align-items-center">
+                                        <input id="fdpCodeInput" type="text" maxlength="4" inputmode="numeric" pattern="[0-9]*"
+                                            placeholder="0000"
+                                            style="width:110px;font-size:2rem;font-weight:900;text-align:center;letter-spacing:0.2em;border:2px solid #fd7e14;border-radius:8px;padding:6px;font-family:monospace;color:#333;"
+                                            oninput="this.value=this.value.replace(/[^0-9]/g,'')">
+                                        <button class="btn btn-warning fw-bold" onclick="startFdpReceive()">
+                                            <i class="bi bi-arrow-down-circle"></i> 受信する
+                                        </button>
+                                    </div>
+                                </div>
+                                <!-- 受信中 -->
+                                <div id="fdpReceiving" style="display:none;text-align:center;padding:8px 0;">
+                                    <div class="spinner-border spinner-border-sm text-warning me-2" role="status"></div>
+                                    <span id="fdpReceiveStatus" class="text-muted small">POS側に接続中...</span>
+                                    <div class="progress mt-2" style="height:4px;">
+                                        <div id="fdpReceiveBar" class="progress-bar bg-warning" style="width:0%;transition:width 0.3s;"></div>
+                                    </div>
+                                </div>
+                                <!-- 受信完了 -->
+                                <div id="fdpReceiveDone" style="display:none;text-align:center;padding:8px 0;">
+                                    <div style="font-size:1.5rem;">✅</div>
+                                    <div class="fw-bold text-success">受信・取込完了！</div>
+                                    <div class="text-muted small mt-1" id="fdpReceiveDoneMsg"></div>
+                                    <button class="btn btn-sm btn-outline-secondary mt-2" onclick="resetFdpReceive()">もう一度受信する</button>
+                                </div>
+                            </div>
+
+                            <!-- 従来のファイル取込 -->
+                            <p class="text-muted small mb-2">または、JSONファイルを手動で読み込む（従来方式）</p>
                             <div class="d-flex gap-2 flex-wrap align-items-center">
-                                <button class="btn btn-warning fw-bold" onclick="document.getElementById('posImportFileInput').click()">
-                                    <i class="bi bi-upload"></i> POSファイルを選択 (.json)
+                                <button class="btn btn-outline-warning btn-sm" onclick="document.getElementById('posImportFileInput').click()">
+                                    <i class="bi bi-upload"></i> JSONファイルを選択
                                 </button>
                                 <input type="file" id="posImportFileInput" accept=".json" style="display:none;" onchange="importFromPOS(event)">
                                 <span class="text-muted small" id="posImportStatus"></span>
@@ -2848,7 +2892,6 @@ global.bootstrap=bootstrap;
         <div class="mb-3"><label class="form-label">住所</label><input type="text" class="form-control" id="profAddress"></div><div class="mb-3"><label class="form-label">代表者名</label><input type="text" class="form-control" id="profOwner"></div>
     </div><div class="modal-footer"><button type="button" class="btn btn-primary w-100" onclick="saveProfile()">保存</button></div></div></div></div>
 
-    <!-- ===== POP Generator Modal ===== -->
     <!-- ===== POP Generator Modal ===== -->
     <div class="modal fade" id="popModal" tabindex="-1">
         <div class="modal-dialog modal-xl">
@@ -3827,7 +3870,7 @@ if (typeof module !== 'undefined' && module.exports) {
             // モーダルインスタンス
             modals: { addFish: null, shipping: null, profile: null, processing: null, pop: null, dbGuide: null },
             // Chart.js インスタンス（destroy前に参照が必要）
-            charts: { sales: null, fishPie: null, margin: null, supplier: null },
+            charts: { sales: null, fishPie: null, margin: null, supplier: null, monthlyTrend: null },
             // POPジェネレーター状態
             pop: { template: 'supermarket' },
             // 一括計算状態
@@ -4943,11 +4986,23 @@ if (typeof module !== 'undefined' && module.exports) {
             const prof = { name: document.getElementById('profName').value, address: document.getElementById('profAddress').value, owner: document.getElementById('profOwner').value, zip: document.getElementById('profZip').value, tel: document.getElementById('profTel').value, type: document.getElementById('profType').value }; 
             try { localStorage.setItem('fishProProfile', JSON.stringify(prof)); } catch(e) { showToast('保存容量を超えました', 'error'); return; } App.modals.profile.hide(); showToast("保存しました"); 
         }
-        function loadProfile() { 
-            const prof = JSON.parse(localStorage.getItem('fishProProfile')); 
-            if(prof) { document.getElementById('profName').value = prof.name; document.getElementById('profAddress').value = prof.address; document.getElementById('profOwner').value = prof.owner; document.getElementById('profZip').value = prof.zip||""; document.getElementById('profTel').value = prof.tel||""; if(prof.type) document.getElementById('profType').value = prof.type; } 
+        function loadProfile() {
+            const prof = JSON.parse(localStorage.getItem('fishProProfile'));
+            if (prof) {
+                document.getElementById('profName').value    = prof.name;
+                document.getElementById('profAddress').value = prof.address;
+                document.getElementById('profOwner').value  = prof.owner;
+                document.getElementById('profZip').value    = prof.zip  || '';
+                document.getElementById('profTel').value    = prof.tel  || '';
+                if (prof.type) document.getElementById('profType').value = prof.type;
+            }
         }
-        function showToast(msg, type='success') { const el = document.getElementById('liveToast'); document.getElementById('toastMessage').innerText = msg; el.className = `toast align-items-center border-0 toast-${type}`; new bootstrap.Toast(el, {delay:3000}).show(); }
+        function showToast(msg, type = 'success') {
+            const el = document.getElementById('liveToast');
+            document.getElementById('toastMessage').innerText = msg;
+            el.className = `toast align-items-center border-0 toast-${type}`;
+            new bootstrap.Toast(el, { delay: 3000 }).show();
+        }
         function safeSetText(id, val) { const el = document.getElementById(id); if(el) el.innerText = val; }
         function escapeHtml(s) { if(typeof s !== 'string') return s; return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;'); }
 
@@ -5506,7 +5561,22 @@ if (typeof module !== 'undefined' && module.exports) {
             currentResult.stock = { cur, sales, days, unit };
             evaluateAI();
         }
-        function saveRecord(type) { let rec; if(type==='cost') rec=currentResult.tempHistory; if(type==='sales') rec=currentResult.sales; if(type==='loss') rec=currentResult.tempHistoryLoss; if(!rec) return showToast("先に計算してください", "error"); historyData.push(rec); const result = StorageEngine.save(historyData); if(!result.ok) { historyData.pop(); return showToast('保存容量を超えました: ' + result.error, 'error'); } showToast("帳簿に記録しました"); renderHistory(); }
+        function saveRecord(type) {
+            let rec;
+            if (type === 'cost')  rec = currentResult.tempHistory;
+            if (type === 'sales') rec = currentResult.sales;
+            if (type === 'loss')  rec = currentResult.tempHistoryLoss;
+            if (!rec) return showToast('先に計算してください', 'error');
+
+            historyData.push(rec);
+            const result = StorageEngine.save(historyData);
+            if (!result.ok) {
+                historyData.pop();
+                return showToast('保存容量を超えました: ' + result.error, 'error');
+            }
+            showToast('帳簿に記録しました');
+            renderHistory();
+        }
         
         function renderHistory() { 
             const tbody = document.getElementById('historyTable').getElementsByTagName('tbody')[0]; 
@@ -7102,6 +7172,132 @@ if (typeof module !== 'undefined' && module.exports) {
             App.modals.dbGuide.show();
         }
 
+        // ===== FDP 直接受信（PeerJS） =====
+        let _fdpRxPeer = null;
+
+        function startFdpReceive() {
+            const code = document.getElementById('fdpCodeInput').value.trim();
+            if (code.length !== 4 || !/^\d{4}$/.test(code)) {
+                alert('4桁の数字を入力してください');
+                return;
+            }
+
+            document.getElementById('fdpReceiveIdle').style.display = 'none';
+            document.getElementById('fdpReceiving').style.display = 'block';
+            document.getElementById('fdpReceiveStatus').textContent = 'PeerJSを読み込み中...';
+            document.getElementById('fdpReceiveBar').style.width = '15%';
+
+            // PeerJS動的ロード
+            if (window.Peer) {
+                _connectFdpPeer(code);
+            } else {
+                const script = document.createElement('script');
+                script.src = 'https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js';
+                script.onload = () => _connectFdpPeer(code);
+                script.onerror = () => {
+                    document.getElementById('fdpReceiveStatus').textContent = '❌ ネット接続を確認してください';
+                    resetFdpReceive();
+                };
+                document.head.appendChild(script);
+            }
+        }
+
+        function _connectFdpPeer(code) {
+            if (_fdpRxPeer) { _fdpRxPeer.destroy(); }
+            document.getElementById('fdpReceiveStatus').textContent = 'POS側に接続中...';
+            document.getElementById('fdpReceiveBar').style.width = '35%';
+
+            _fdpRxPeer = new Peer();
+            _fdpRxPeer.on('open', () => {
+                document.getElementById('fdpReceiveStatus').textContent = 'データを受信中...';
+                document.getElementById('fdpReceiveBar').style.width = '60%';
+
+                const conn = _fdpRxPeer.connect('fdppos-' + code);
+
+                conn.on('open', () => {
+                    document.getElementById('fdpReceiveStatus').textContent = 'データを受け取っています...';
+                    document.getElementById('fdpReceiveBar').style.width = '80%';
+                });
+
+                conn.on('data', (raw) => {
+                    try {
+                        const data = typeof raw === 'string' ? JSON.parse(raw) : raw;
+                        document.getElementById('fdpReceiveBar').style.width = '95%';
+
+                        if (!data._fdp_pos_export || !Array.isArray(data.records)) {
+                            document.getElementById('fdpReceiveStatus').textContent = '❌ 無効なデータです';
+                            resetFdpReceive();
+                            return;
+                        }
+
+                        // 既存のimportFromPOS相当の処理
+                        const existing = historyData.filter(r => r._posImport && r.date === data.date);
+                        const existingKey = new Set(existing.map(r => r.fish + '|' + r.amount));
+                        let added = 0, skipped = 0;
+                        data.records.forEach(rec => {
+                            const key = rec.fish + '|' + rec.amount;
+                            if (existingKey.has(key)) { skipped++; return; }
+                            historyData.push(rec);
+                            added++;
+                        });
+
+                        if (added > 0) {
+                            StorageEngine.save(historyData);
+                            renderHistory();
+                        }
+
+                        document.getElementById('fdpReceiveBar').style.width = '100%';
+                        document.getElementById('fdpReceiving').style.display = 'none';
+                        document.getElementById('fdpReceiveDone').style.display = 'block';
+
+                        const skipMsg = skipped > 0 ? `（${skipped}件は重複スキップ）` : '';
+                        document.getElementById('fdpReceiveDoneMsg').textContent =
+                            added > 0 ? `${added}件を取込しました ${skipMsg}` : `全件取込済みでした ${skipMsg}`;
+
+                        if (added > 0) showToast(`POS直接取込完了: ${added}件追加`, 'success');
+
+                        // 履歴タブへ移動
+                        const histTab = document.getElementById('tab-btn-history');
+                        if (histTab && added > 0) histTab.click();
+
+                    } catch(e) {
+                        document.getElementById('fdpReceiveStatus').textContent = '❌ データエラー: ' + e.message;
+                        setTimeout(resetFdpReceive, 2000);
+                    }
+                    if (_fdpRxPeer) { _fdpRxPeer.destroy(); _fdpRxPeer = null; }
+                });
+
+                conn.on('error', (err) => {
+                    document.getElementById('fdpReceiveStatus').textContent = '❌ 接続エラー。コードを確認してください';
+                    setTimeout(resetFdpReceive, 2500);
+                });
+
+                // 30秒タイムアウト
+                setTimeout(() => {
+                    if (document.getElementById('fdpReceiving').style.display !== 'none') {
+                        document.getElementById('fdpReceiveStatus').textContent = '⏱ タイムアウト。POS側のコードを確認してください';
+                        setTimeout(resetFdpReceive, 2500);
+                        if (_fdpRxPeer) { _fdpRxPeer.destroy(); _fdpRxPeer = null; }
+                    }
+                }, 30000);
+            });
+
+            _fdpRxPeer.on('error', (err) => {
+                const msg = err.type === 'peer-unavailable' ? 'コードが見つかりません。POS側で先に送信ボタンを押してください' : '接続エラー: ' + err.message;
+                document.getElementById('fdpReceiveStatus').textContent = '❌ ' + msg;
+                setTimeout(resetFdpReceive, 3000);
+            });
+        }
+
+        function resetFdpReceive() {
+            if (_fdpRxPeer) { _fdpRxPeer.destroy(); _fdpRxPeer = null; }
+            document.getElementById('fdpReceiveIdle').style.display = 'block';
+            document.getElementById('fdpReceiving').style.display = 'none';
+            document.getElementById('fdpReceiveDone').style.display = 'none';
+            document.getElementById('fdpCodeInput').value = '';
+            document.getElementById('fdpReceiveBar').style.width = '0%';
+        }
+
         // ===== POS取込 — Fish POS Pro JSON インポート =====
         function importFromPOS(event) {
             const file = event.target.files[0];
@@ -7576,11 +7772,54 @@ if (typeof module !== 'undefined' && module.exports) {
         })();
 
         function backupData() {
-            try { const backup = { history: historyData, profile: JSON.parse(localStorage.getItem('fishProProfile') || '{}'), goals: JSON.parse(localStorage.getItem('fishProGoals') || '{}'), customFish: JSON.parse(localStorage.getItem('customFishDB') || '[]'), version: "1.4.0", backupDate: new Date().toISOString() }; const blob = new Blob([JSON.stringify(backup, null, 2)], {type: "application/json"}); const url = URL.createObjectURL(blob); const a = document.createElement("a"); a.href = url; a.download = `fishpro_fullbackup_${new Date().toISOString().slice(0,10)}.json`; a.click(); URL.revokeObjectURL(url); showToast("完全バックアップ作成完了"); } catch(e) { alert("バックアップ失敗: " + e.message); }
+            try {
+                const backup = {
+                    history:    historyData,
+                    profile:    JSON.parse(localStorage.getItem('fishProProfile') || '{}'),
+                    goals:      JSON.parse(localStorage.getItem('fishProGoals')   || '{}'),
+                    customFish: JSON.parse(localStorage.getItem('customFishDB')   || '[]'),
+                    version:    '1.4.0',
+                    backupDate: new Date().toISOString()
+                };
+                const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `fishpro_fullbackup_${new Date().toISOString().slice(0, 10)}.json`;
+                a.click();
+                URL.revokeObjectURL(url);
+                showToast('完全バックアップ作成完了');
+            } catch(e) {
+                alert('バックアップ失敗: ' + e.message);
+            }
         }
         function restoreData(event) {
-            const file = event.target.files[0]; if (!file) return; const reader = new FileReader();
-            reader.onload = function(e) { try { const backup = JSON.parse(e.target.result); if(!backup.history) { alert("無効なバックアップファイル"); return; } if(confirm(`復元件数: ${backup.history.length}件\nプロファイル: ${backup.profile?.name || 'なし'}\n\n現在のデータを上書きしますか？`)) { historyData = backup.history; StorageEngine.save(historyData); if(backup.profile) localStorage.setItem('fishProProfile', JSON.stringify(backup.profile)); if(backup.goals) localStorage.setItem('fishProGoals', JSON.stringify(backup.goals)); if(backup.customFish) localStorage.setItem('customFishDB', JSON.stringify(backup.customFish)); renderHistory(); updateCharts(); loadGoals(); showToast("データ復元完了"); location.reload(); } } catch(err) { alert("復元失敗: " + err.message); } event.target.value = ""; }; reader.readAsText(file);
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const backup = JSON.parse(e.target.result);
+                    if (!backup.history) { alert('無効なバックアップファイル'); return; }
+                    const msg = `復元件数: ${backup.history.length}件\nプロファイル: ${backup.profile?.name || 'なし'}\n\n現在のデータを上書きしますか？`;
+                    if (confirm(msg)) {
+                        historyData = backup.history;
+                        StorageEngine.save(historyData);
+                        if (backup.profile)    localStorage.setItem('fishProProfile', JSON.stringify(backup.profile));
+                        if (backup.goals)      localStorage.setItem('fishProGoals',   JSON.stringify(backup.goals));
+                        if (backup.customFish) localStorage.setItem('customFishDB',   JSON.stringify(backup.customFish));
+                        renderHistory();
+                        updateCharts();
+                        loadGoals();
+                        showToast('データ復元完了');
+                        location.reload();
+                    }
+                } catch(err) {
+                    alert('復元失敗: ' + err.message);
+                }
+                event.target.value = '';
+            };
+            reader.readAsText(file);
         }
 
         // App.charts.sales/fishPie/margin/supplier を使用
@@ -7669,10 +7908,75 @@ if (typeof module !== 'undefined' && module.exports) {
                     } 
                 } 
             });
+
+            // ── 月次推移グラフ（直近6ヶ月） ──
+            const monthlyData = {};
+            historyData.forEach(r => {
+                const m = r._archive ? r.date : (r.date || '').slice(0, 7).replace('/', '-');
+                if (!m || m.length < 7) return;
+                if (!monthlyData[m]) monthlyData[m] = { sales: 0, cost: 0, loss: 0 };
+                if (r._archive) {
+                    monthlyData[m].sales += (r.sa || 0);
+                    monthlyData[m].cost  += (r.si || 0);
+                    monthlyData[m].loss  += (r.lo || 0);
+                } else {
+                    if (r.type === '売上' || r.type === '売上記録') monthlyData[m].sales += r.amount;
+                    else if (r.type === '仕入' || r.type === '原価計算') monthlyData[m].cost += r.amount;
+                    else if (r.type === '廃棄') monthlyData[m].loss += r.amount;
+                }
+            });
+            const mLabels = Object.keys(monthlyData).sort().slice(-6);
+            const mSales  = mLabels.map(m => Math.round(monthlyData[m].sales));
+            const mMargin = mLabels.map(m => {
+                const s = monthlyData[m].sales, c = monthlyData[m].cost, l = monthlyData[m].loss;
+                return s > 0 ? Math.round(((s - c - l) / s) * 100) : 0;
+            });
+            const ctxM = document.getElementById('monthlyTrendChart');
+            if (ctxM) {
+                if (App.charts.monthlyTrend) App.charts.monthlyTrend.destroy();
+                App.charts.monthlyTrend = new Chart(ctxM, {
+                    type: 'bar',
+                    data: {
+                        labels: mLabels,
+                        datasets: [
+                            { label: '月次売上 (円)', data: mSales, backgroundColor: 'rgba(13,110,253,0.6)', yAxisID: 'y' },
+                            { label: '粗利率 (%)', data: mMargin, type: 'line', borderColor: '#198754', backgroundColor: 'rgba(25,135,84,0.1)', tension: 0.3, fill: true, yAxisID: 'y2' }
+                        ]
+                    },
+                    options: {
+                        responsive: true, maintainAspectRatio: false,
+                        plugins: { legend: { position: 'top' } },
+                        scales: {
+                            y:  { beginAtZero: true, position: 'left',  ticks: { callback: v => (v/10000).toFixed(0) + '万' } },
+                            y2: { beginAtZero: true, position: 'right', max: 100, grid: { drawOnChartArea: false }, ticks: { callback: v => v + '%' } }
+                        }
+                    }
+                });
+            }
         }
 
-        function saveGoals() { const goals = { sales: parseFloat(document.getElementById('goalSales').value) || 0, margin: parseFloat(document.getElementById('goalMargin').value) || 0, loss: parseFloat(document.getElementById('goalLoss').value) || 0 }; if(goals.margin > 100 || goals.loss > 100) { showToast('目標値が不正です（0〜100%の範囲で入力してください）', 'error'); return; } localStorage.setItem('fishProGoals', JSON.stringify(goals)); showToast("目標を保存しました"); updateGoalProgress(); if(typeof updateGPAlertPanel==='function') updateGPAlertPanel(); }
-        function loadGoals() { const goals = JSON.parse(localStorage.getItem('fishProGoals') || '{}'); if(goals.sales) document.getElementById('goalSales').value = goals.sales; if(goals.margin) document.getElementById('goalMargin').value = goals.margin; if(goals.loss) document.getElementById('goalLoss').value = goals.loss; updateGoalProgress(); }
+        function saveGoals() {
+            const goals = {
+                sales:  parseFloat(document.getElementById('goalSales').value)  || 0,
+                margin: parseFloat(document.getElementById('goalMargin').value) || 0,
+                loss:   parseFloat(document.getElementById('goalLoss').value)   || 0
+            };
+            if (goals.margin > 100 || goals.loss > 100) {
+                showToast('目標値が不正です（0〜100%の範囲で入力してください）', 'error');
+                return;
+            }
+            localStorage.setItem('fishProGoals', JSON.stringify(goals));
+            showToast('目標を保存しました');
+            updateGoalProgress();
+            if (typeof updateGPAlertPanel === 'function') updateGPAlertPanel();
+        }
+        function loadGoals() {
+            const goals = JSON.parse(localStorage.getItem('fishProGoals') || '{}');
+            if (goals.sales)  document.getElementById('goalSales').value  = goals.sales;
+            if (goals.margin) document.getElementById('goalMargin').value = goals.margin;
+            if (goals.loss)   document.getElementById('goalLoss').value   = goals.loss;
+            updateGoalProgress();
+        }
         function updateGoalProgress() {
             const goals = JSON.parse(localStorage.getItem('fishProGoals') || '{}');
             const gpEl = document.getElementById('goalProgress');
@@ -8771,24 +9075,6 @@ if (typeof module !== 'undefined' && module.exports) {
                 '</div>';
         }
 
-        const _origRenderHistory = renderHistory;
-        renderHistory = function() { 
-            _origRenderHistory(); 
-            if(typeof Chart !== 'undefined' && typeof updateCharts === 'function') { 
-                updateCharts(); 
-            } 
-            if(typeof updateGoalProgress === 'function') {
-                updateGoalProgress(); 
-            }
-            if(typeof updateGPAlertPanel === 'function') {
-                updateGPAlertPanel();
-            }
-            // Fix v2.0.6: データ変更時にセレクタを常に同期
-            if(typeof buildPriceHistSelector === 'function') {
-                buildPriceHistSelector();
-            }
-        };
-
         // ============================================================
         //  v1.8.0 新機能: ダッシュボード / リアルタイムバリデーション / POPズーム
         // ============================================================
@@ -8981,29 +9267,23 @@ if (typeof module !== 'undefined' && module.exports) {
             else if (canvas.webkitRequestFullscreen) canvas.webkitRequestFullscreen();
         }
 
-        // ===== ストレージ警告強化 =====
+        // ─────────────────────────────────────────────────────────────
+        //  updateStorageIndicator 拡張フック (v1.8)
+        //  【保守メモ】元の updateStorageIndicator() に追加処理をフックする。
+        //  ストレージ使用率に応じて .card-db-manager にクラスを付与し
+        //  CSS アニメーション（pulse-red）を発動させる。
+        // ─────────────────────────────────────────────────────────────
         const _origUpdateStorage = updateStorageIndicator;
         updateStorageIndicator = function() {
             _origUpdateStorage();
-            // ストレージ使用率に応じてcontainerクラスを変更
+            // ストレージ使用率に応じて container クラスを変更
             const barEl = document.getElementById('storageUsageBar');
             if (!barEl) return;
             const pct = parseFloat(barEl.style.width) || 0;
             const container = document.querySelector('.card-db-manager') || document.body;
             container.classList.remove('storage-warning', 'storage-critical');
-            if (pct >= 85) container.classList.add('storage-critical');
+            if (pct >= 85)      container.classList.add('storage-critical');
             else if (pct >= 65) container.classList.add('storage-warning');
-        };
-
-        // renderHistory をラップしてダッシュボードも更新（ダッシュボードが開いている場合のみ）
-        const _origRenderHistoryV18 = renderHistory;
-        renderHistory = function() {
-            _origRenderHistoryV18();
-            // ダッシュボードタブがアクティブなら即更新
-            const dashPane = document.getElementById('tabDashboard');
-            if (dashPane && dashPane.classList.contains('show')) {
-                refreshDashboard();
-            }
         };
 
 
@@ -9703,11 +9983,15 @@ if (typeof module !== 'undefined' && module.exports) {
         })();
 
         // ─────────────────────────────────────────────
-        //  backupData をフックしてリマインダーリセット
+        //  backupData をフックしてリマインダーリセット (v1.9)
+        //  【保守メモ】バックアップ実行後に BackupReminder の経過日数をリセット。
         // ─────────────────────────────────────────────
-        (function(){
-            const _orig = backupData;
-            backupData = function() { _orig(); BackupReminder.record(); };
+        (function() {
+            const _origBackup = backupData;
+            backupData = function() {
+                _origBackup();
+                BackupReminder.record();
+            };
         })();
 
         // ─────────────────────────────────────────────
@@ -9725,14 +10009,49 @@ if (typeof module !== 'undefined' && module.exports) {
             };
         })();
 
-        // ─────────────────────────────────────────────
-        //  renderHistory をフックしてリマインダー確認
-        // ─────────────────────────────────────────────
-        (function(){
-            const _origV18 = renderHistory;
+        // ─────────────────────────────────────────────────────────────
+        //  renderHistory 統合フック
+        //  【保守メモ】renderHistory に追加処理をフックする場合は
+        //  ここだけ編集する。多重上書きは禁止。
+        //
+        //  フック内容（v1.5→v1.8→v1.9 の統合）:
+        //    1. updateCharts()          — グラフ更新 (v1.5)
+        //    2. updateGoalProgress()    — 目標進捗 (v1.7)
+        //    3. updateGPAlertPanel()    — 粗利ウォッチャー (v2.0)
+        //    4. buildPriceHistSelector()— 魚種別価格セレクタ同期 (v2.0.6)
+        //    5. refreshDashboard()      — ダッシュボード即時更新 (v1.8)
+        //    6. BackupReminder.check()  — バックアップリマインダー確認 (v1.9)
+        // ─────────────────────────────────────────────────────────────
+        (function() {
+            const _origRenderHistory = renderHistory;
             renderHistory = function() {
-                _origV18();
-                BackupReminder.check();
+                _origRenderHistory();
+
+                // グラフ・目標・粗利ウォッチャー更新
+                if (typeof Chart !== 'undefined' && typeof updateCharts === 'function') {
+                    updateCharts();
+                }
+                if (typeof updateGoalProgress === 'function') {
+                    updateGoalProgress();
+                }
+                if (typeof updateGPAlertPanel === 'function') {
+                    updateGPAlertPanel();
+                }
+                // データ変更時にセレクタを常に同期 (v2.0.6)
+                if (typeof buildPriceHistSelector === 'function') {
+                    buildPriceHistSelector();
+                }
+
+                // ダッシュボードタブがアクティブなら即時更新 (v1.8)
+                const dashPane = document.getElementById('tabDashboard');
+                if (dashPane && dashPane.classList.contains('show')) {
+                    if (typeof refreshDashboard === 'function') refreshDashboard();
+                }
+
+                // バックアップリマインダー確認 (v1.9)
+                if (typeof BackupReminder !== 'undefined') {
+                    BackupReminder.check();
+                }
             };
         })();
 
